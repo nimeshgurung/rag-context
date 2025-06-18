@@ -31,6 +31,7 @@
     "@mastra/memory": "^0.10.4",
     "@mastra/pg": "^0.11.0",
     "@mastra/rag": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.12.3",
     "@types/commander": "^2.12.0",
     "@types/js-yaml": "^4.0.9",
     "@types/pg": "^8.15.4",

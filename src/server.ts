@@ -13,9 +13,7 @@ const resolveLibraryIdInput = z.object({
 });
 
 const getLibraryDocsInput = z.object({
-  context7CompatibleLibraryID: z
-    .string()
-    .describe('The unique ID of the library.'),
+  libraryId: z.string().describe('The unique ID of the library.'),
   topic: z
     .string()
     .optional()
@@ -55,8 +53,8 @@ const server = new MCPServer({
           'The relevant documentation chunks, concatenated into a single string.',
         ),
       execute: async ({ context }) => {
-        const { context7CompatibleLibraryID, topic, tokens } = context;
-        return fetchLibraryDocumentation(context7CompatibleLibraryID, {
+        const { libraryId, topic, tokens } = context;
+        return fetchLibraryDocumentation(libraryId, {
           topic,
           tokens,
         });
