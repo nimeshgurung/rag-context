@@ -1,4 +1,5 @@
 import { MCPServer } from '@mastra/mcp';
+import 'dotenv/config';
 import { z } from 'zod';
 import { createTool } from '@mastra/core';
 import { searchLibraries, fetchLibraryDocumentation } from './lib/api';

@@ -11,7 +11,11 @@ const openai = createOpenAI({
 
 // Initialize PostgreSQL client pool
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_CONNECTION_STRING,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || 'db',
+  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
 });
 
 export async function searchLibraries(
@@ -86,5 +90,3 @@ export async function fetchLibraryDocumentation(
 
   return rows.map((row) => row.original_text).join('\n\n---\n\n');
 }
-
-// TODO: Implement fetchLibraryDocumentation function
