@@ -1,0 +1,64 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+.roo/
+.cursor
+.cursor/
+.taskmaster/
+
+# production
+/build
+/dist
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# taskmaster
+.taskmaster/reports/
+.taskmaster/state.json
+
+# pgdata
+/pgdata
+
+output.txt
+dist
+.mastra
+.env.development
+.env
+*.db
+*.db-*
+
+# Logs
+logs
+*.log
+dev-debug.log
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS specific
+.DS_Store
+prd.txt

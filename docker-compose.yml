@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg15
+    container_name: slop_db
+    restart: always
+    environment:
+      POSTGRES_DB: slop_db
+      POSTGRES_USER: slop_user
+      POSTGRES_PASSWORD: slop_password
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
