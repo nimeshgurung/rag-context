@@ -1,7 +1,17 @@
 import { SlopChunk } from '../types';
 import { OpenAPIV3 } from 'openapi-types';
-import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'crypto';
 import yaml from 'js-yaml';
+
+function generateDeterministicId(
+  libraryId: string,
+  contentType: string,
+  content: string,
+  extra?: string,
+): string {
+  const input = `${libraryId}-${contentType}-${content}${extra ? `-${extra}` : ''}`;
+  return createHash('sha256').update(input).digest('hex');
+}
 
 export function convertToSlopChunks(
   libraryId: string,
@@ -16,7 +26,7 @@ export function convertToSlopChunks(
   });
 
   chunks.push({
-    id: uuidv4(),
+    id: generateDeterministicId(libraryId, 'API_OVERVIEW', overviewText),
     libraryId,
     contentType: 'API_OVERVIEW',
     originalText: overviewText,
@@ -54,7 +64,12 @@ export function convertToSlopChunks(
             });
 
             chunks.push({
-              id: uuidv4(),
+              id: generateDeterministicId(
+                libraryId,
+                'OPERATION',
+                operationText,
+                `${path}-${method}`,
+              ),
               libraryId,
               contentType: 'OPERATION',
               originalText: operationText,
@@ -81,7 +96,12 @@ export function convertToSlopChunks(
         });
 
         chunks.push({
-          id: uuidv4(),
+          id: generateDeterministicId(
+            libraryId,
+            'SCHEMA_DEFINITION',
+            schemaText,
+            schemaName,
+          ),
           libraryId,
           contentType: 'SCHEMA_DEFINITION',
           originalText: schemaText,
