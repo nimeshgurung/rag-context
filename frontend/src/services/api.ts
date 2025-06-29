@@ -12,6 +12,7 @@ interface SearchResult {
 export interface AddSourceResponse {
   success: boolean;
   message: string;
+  jobId?: string;
   libraryId?: string;
 }
 

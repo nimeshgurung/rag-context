@@ -1,16 +1,17 @@
 import { PlaywrightCrawler } from 'crawlee';
 import TurndownService from 'turndown';
 import dedent from 'dedent';
-import { EnrichedItem } from '../types';
+import { EnrichedItem, WebScrapeSource } from '../types';
 import { loadConfig } from './config';
 import { getEnrichedDataFromLLM } from './enrichment';
 import { saveEnrichedData } from './storage';
 import pool from '../db';
-import { WebScrapeSource } from '../types';
+import { sendEvent } from '../events';
 
 const turndownService = new TurndownService();
 
 export async function crawlSingleSource(
+  jobId: string,
   source: WebScrapeSource,
   libraryId: string,
   libraryDescription: string,
@@ -21,7 +22,11 @@ export async function crawlSingleSource(
   const crawler = new PlaywrightCrawler({
     maxRequestsPerCrawl: maxDepth,
     async requestHandler({ request, page, enqueueLinks, log }) {
-      log.info(`Processing: ${request.url}`);
+      log.info(`[Job ${jobId}] Processing: ${request.url}`);
+      sendEvent(jobId, {
+        type: 'progress',
+        message: `Crawling: ${request.url}`,
+      });
 
       const mainContentHTML = await page.evaluate((selector) => {
         const el = document.querySelector(selector);
@@ -72,13 +77,21 @@ export async function crawlSingleSource(
       });
     },
     failedRequestHandler({ request, log }) {
-      log.error(`Request ${request.url} failed and will not be retried.`);
+      log.error(
+        `[Job ${jobId}] Request ${request.url} failed and will not be retried.`,
+      );
+      sendEvent(jobId, {
+        type: 'progress',
+        message: `Failed to crawl: ${request.url}`,
+      });
     },
   });
 
-  console.log(`Starting crawl for ${libraryId} at ${startUrl}...`);
+  console.log(
+    `[Job ${jobId}] Starting crawl for ${libraryId} at ${startUrl}...`,
+  );
   await crawler.run([startUrl]);
-  console.log(`Crawl for ${libraryId} finished successfully.`);
+  console.log(`[Job ${jobId}] Crawl for ${libraryId} finished successfully.`);
 }
 
 export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {

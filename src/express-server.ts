@@ -7,12 +7,14 @@ import {
   addDocumentationSource,
 } from './lib/api';
 import { DocumentationSource } from './lib/types';
+import { addClient, removeClient } from './lib/events';
+import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 const port = 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 app.get('/api/libraries', async (_req: Request, res: Response) => {
   try {
@@ -57,24 +59,33 @@ app.post('/api/docs', async (req: Request, res: Response) => {
 app.post('/api/libraries/add-source', async (req: Request, res: Response) => {
   const source = req.body as DocumentationSource;
 
-  // Basic validation
   if (!source || !source.type) {
     res.status(400).json({ error: 'Invalid source data' });
     return;
   }
 
-  try {
-    const result = await addDocumentationSource(source);
-    res.json(result);
-  } catch (error) {
-    console.error('Failed to add documentation source:', error);
-    const errorMessage =
-      error instanceof Error ? error.message : 'An unknown error occurred';
-    res.status(500).json({
-      error: 'Failed to add documentation source',
-      details: errorMessage,
-    });
-  }
+  const jobId = uuidv4();
+
+  // Don't await, let it run in the background
+  addDocumentationSource(jobId, source);
+
+  res.status(202).json({ jobId });
+});
+
+app.get('/api/jobs/:jobId/events', (req, res) => {
+  const { jobId } = req.params;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  addClient(jobId, res);
+
+  req.on('close', () => {
+    removeClient(jobId);
+    res.end();
+  });
 });
 
 app.listen(port, () => {

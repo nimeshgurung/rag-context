@@ -17,6 +17,7 @@ import { OpenAPIV3 } from 'openapi-types';
 import { convertToSlopChunks } from '../slop/converter';
 import { SlopChunk } from '../types';
 import { crawlSingleSource } from './crawler/main';
+import { sendEvent, closeConnection } from './events';
 
 // Initialize OpenAI client
 export const openai = createOpenAI({
@@ -219,146 +220,178 @@ ${row.original_text}
   return formattedResults.join('\n\n---\n\n');
 }
 
-async function handleApiSpecSource(source: ApiSpecSource) {
-  const libraryId = slug(source.name);
-
-  const { rows: existing } = await pool.query(
-    'SELECT id FROM libraries WHERE id = $1',
-    [libraryId],
-  );
-  if (existing.length > 0) {
-    throw new Error(
-      `Library with ID ${libraryId} already exists. Please choose a different name.`,
-    );
-  }
-
-  const { embedding } = await embed({
-    model: openai.embedding('text-embedding-3-small'),
-    value: `${source.name}: ${source.description}`,
-  });
-
-  await pool.query(
-    'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
-    [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
-  );
-
-  const storageDir = path.join(process.cwd(), 'storage', 'specs');
-  await fs.mkdir(storageDir, { recursive: true });
-
-  const extension =
-    source.sourceType === 'file' && source.content.trim().startsWith('{')
-      ? 'json'
-      : 'yaml';
-  const filePath = path.join(storageDir, `${libraryId}.${extension}`);
-  await fs.writeFile(filePath, source.content);
-
-  // Parse spec and ingest embeddings
-  const spec = (await SwaggerParser.bundle(filePath)) as OpenAPIV3.Document;
-  const chunks: SlopChunk[] = convertToSlopChunks(libraryId, spec);
-
-  if (chunks.length === 0) {
-    console.warn(`No chunks generated for ${libraryId}.`);
-    return {
-      success: true,
-      message: `Library ${libraryId} created, but no content was ingested.`,
-      libraryId,
-    };
-  }
-
-  const { embeddings: chunkEmbeddings } = await embedMany({
-    model: openai.embedding('text-embedding-3-small'),
-    values: chunks.map((chunk) => chunk.originalText),
-  });
-
-  const client = await pool.connect();
+async function handleApiSpecSource(jobId: string, source: ApiSpecSource) {
   try {
-    await client.query('BEGIN');
+    sendEvent(jobId, {
+      type: 'progress',
+      message: 'Creating library entry...',
+    });
+    const libraryId = slug(source.name);
 
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const embedding = chunkEmbeddings[i];
-
-      const query = `
-        INSERT INTO slop_embeddings (vector_id, library_id, content_type, original_text, embedding, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (vector_id) DO NOTHING;
-      `;
-
-      await client.query(query, [
-        chunk.id,
-        chunk.libraryId,
-        chunk.contentType,
-        chunk.originalText,
-        `[${embedding.join(',')}]`,
-        chunk.metadata,
-      ]);
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM libraries WHERE id = $1',
+      [libraryId],
+    );
+    if (existing.length > 0) {
+      throw new Error(`Library with name "${source.name}" already exists.`);
     }
 
-    await client.query('COMMIT');
-    console.log(
-      `Successfully embedded and stored ${chunks.length} vectors for ${libraryId}.`,
-    );
-  } catch (e) {
-    await client.query('ROLLBACK');
-    throw e;
-  } finally {
-    client.release();
-  }
+    const { embedding } = await embed({
+      model: openai.embedding('text-embedding-3-small'),
+      value: `${source.name}: ${source.description}`,
+    });
 
-  return {
-    success: true,
-    message: `Library ${libraryId} created and ingested.`,
-    libraryId,
-  };
+    await pool.query(
+      'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
+      [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
+    );
+
+    sendEvent(jobId, {
+      type: 'progress',
+      message: 'Library entry created. Storing spec file...',
+    });
+    const storageDir = path.join(process.cwd(), 'storage', 'specs');
+    await fs.mkdir(storageDir, { recursive: true });
+
+    const extension =
+      source.sourceType === 'file' && source.content.trim().startsWith('{')
+        ? 'json'
+        : 'yaml';
+    const filePath = path.join(storageDir, `${libraryId}.${extension}`);
+    await fs.writeFile(filePath, source.content);
+
+    sendEvent(jobId, {
+      type: 'progress',
+      message: 'Parsing API specification...',
+    });
+    const spec = (await SwaggerParser.bundle(filePath)) as OpenAPIV3.Document;
+    const chunks: SlopChunk[] = convertToSlopChunks(libraryId, spec);
+
+    if (chunks.length === 0) {
+      closeConnection(jobId, {
+        type: 'done',
+        message: `Library ${libraryId} created, but no content was ingested.`,
+      });
+      return;
+    }
+
+    sendEvent(jobId, {
+      type: 'progress',
+      message: `Embedding ${chunks.length} content chunks...`,
+    });
+    const { embeddings: chunkEmbeddings } = await embedMany({
+      model: openai.embedding('text-embedding-3-small'),
+      values: chunks.map((chunk) => chunk.originalText),
+    });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const embedding = chunkEmbeddings[i];
+        const query = `
+          INSERT INTO slop_embeddings (vector_id, library_id, content_type, original_text, embedding, metadata)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          ON CONFLICT (vector_id) DO NOTHING;
+        `;
+        await client.query(query, [
+          chunk.id,
+          chunk.libraryId,
+          chunk.contentType,
+          chunk.originalText,
+          `[${embedding.join(',')}]`,
+          chunk.metadata,
+        ]);
+        if ((i + 1) % 5 === 0) {
+          sendEvent(jobId, {
+            type: 'progress',
+            message: `Processed ${i + 1} of ${chunks.length} chunks...`,
+          });
+        }
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+    closeConnection(jobId, {
+      type: 'done',
+      message: `Library ${libraryId} created and ingested successfully.`,
+    });
+  } catch (error) {
+    console.error(`[Job ${jobId}] Error in handleApiSpecSource:`, error);
+    const message =
+      error instanceof Error ? error.message : 'An unknown error occurred.';
+    closeConnection(jobId, { type: 'error', message });
+  }
 }
 
-async function handleWebScrapeSource(source: WebScrapeSource) {
-  const libraryId = slug(source.name);
+async function handleWebScrapeSource(jobId: string, source: WebScrapeSource) {
+  try {
+    sendEvent(jobId, {
+      type: 'progress',
+      message: 'Creating library entry...',
+    });
+    const libraryId = slug(source.name);
 
-  const { rows: existing } = await pool.query(
-    'SELECT id FROM libraries WHERE id = $1',
-    [libraryId],
-  );
-  if (existing.length > 0) {
-    throw new Error(
-      `Library with ID ${libraryId} already exists. Please choose a different name.`,
+    const { rows: existing } = await pool.query(
+      'SELECT id FROM libraries WHERE id = $1',
+      [libraryId],
     );
+    if (existing.length > 0) {
+      throw new Error(`Library with name "${source.name}" already exists.`);
+    }
+
+    const { embedding } = await embed({
+      model: openai.embedding('text-embedding-3-small'),
+      value: `${source.name}: ${source.description}`,
+    });
+
+    await pool.query(
+      'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
+      [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
+    );
+
+    sendEvent(jobId, {
+      type: 'progress',
+      message: 'Library entry created. Starting web crawl...',
+    });
+    await crawlSingleSource(jobId, source, libraryId, source.description);
+
+    closeConnection(jobId, {
+      type: 'done',
+      message: `Library ${libraryId} crawled and ingested successfully.`,
+    });
+  } catch (error) {
+    console.error(`[Job ${jobId}] Error in handleWebScrapeSource:`, error);
+    const message =
+      error instanceof Error ? error.message : 'An unknown error occurred.';
+    closeConnection(jobId, { type: 'error', message });
   }
-
-  const { embedding } = await embed({
-    model: openai.embedding('text-embedding-3-small'),
-    value: `${source.name}: ${source.description}`,
-  });
-
-  await pool.query(
-    'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
-    [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
-  );
-
-  // Trigger crawler in the background (fire and forget)
-  crawlSingleSource(source, libraryId, source.description).catch((error) => {
-    console.error(`Crawl for ${libraryId} failed:`, error);
-    // Optional: Update library status to 'failed' in the DB
-  });
-
-  return {
-    success: true,
-    message: `Library ${libraryId} created. Crawling will begin shortly.`,
-    libraryId,
-  };
 }
 
-export async function addDocumentationSource(source: DocumentationSource) {
-  if (source.type === 'api-spec') {
-    return handleApiSpecSource(source);
-  } else if (source.type === 'web-scrape') {
-    return handleWebScrapeSource(source);
-  } else {
-    // This should not happen with proper typing
-    console.error('Unknown documentation source type');
-    throw new Error('Unknown documentation source type');
+export async function addDocumentationSource(
+  jobId: string,
+  source: DocumentationSource,
+) {
+  try {
+    if (source.type === 'api-spec') {
+      await handleApiSpecSource(jobId, source);
+    } else if (source.type === 'web-scrape') {
+      await handleWebScrapeSource(jobId, source);
+    } else {
+      throw new Error('Unknown documentation source type');
+    }
+  } catch (error) {
+    console.error(
+      `[Job ${jobId}] Failed to process documentation source:`,
+      error,
+    );
+    const message =
+      error instanceof Error ? error.message : 'An unknown error occurred.';
+    closeConnection(jobId, { type: 'error', message });
   }
-
-  // For now, just return a success message
-  return { success: true, message: 'Source received' };
 }

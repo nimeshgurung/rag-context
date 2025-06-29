@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Link, Typography, Box, TextField } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { getLibraries } from '../services/api';
@@ -15,21 +15,32 @@ const HomePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  const fetchLibraries = useCallback(async () => {
+    try {
+      setLoading(true);
+      const results = await getLibraries();
+      setLibraries(results);
+    } catch (error) {
+      console.error('Failed to fetch libraries', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchLibraries = async () => {
-      try {
-        setLoading(true);
-        const results = await getLibraries();
-        setLibraries(results);
-      } catch (error) {
-        console.error('Failed to fetch libraries', error);
-      } finally {
-        setLoading(false);
-      }
+    fetchLibraries();
+
+    const handleLibraryAdded = () => {
+      console.log('New library added, refetching list...');
+      fetchLibraries();
     };
 
-    fetchLibraries();
-  }, []);
+    window.addEventListener('library-added', handleLibraryAdded);
+
+    return () => {
+      window.removeEventListener('library-added', handleLibraryAdded);
+    };
+  }, [fetchLibraries]);
 
   const filteredLibraries = libraries.filter(library =>
     library.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
