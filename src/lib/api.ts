@@ -1,22 +1,43 @@
 import 'dotenv/config';
-import { Pool } from 'pg';
 import { createOpenAI } from '@ai-sdk/openai';
-import { embed } from 'ai';
+import { embed, generateObject } from 'ai';
 import { LibrarySearchResult } from './types';
+import pool from './db';
+import { z } from 'zod';
 
 // Initialize OpenAI client
-const openai = createOpenAI({
+export const openai = createOpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+export async function generateObjectFromPrompt<T extends z.ZodTypeAny>({
+  prompt,
+  systemPrompt,
+  schema,
+  model = 'gpt-4o-mini',
+}: {
+  prompt: string;
+  systemPrompt: string;
+  schema: T;
+  model?: string;
+}): Promise<z.infer<T>> {
+  const { object } = await generateObject({
+    model: openai(model),
+    schema,
+    prompt,
+    system: systemPrompt,
+  });
+  return object;
+}
+
 // Initialize PostgreSQL client pool
-const pool = new Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  host: process.env.DB_HOST || 'db',
-  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
-});
+// const pool = new Pool({
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.DB_NAME,
+//   host: process.env.DB_HOST || 'db',
+//   port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
+// });
 
 export async function searchLibraries(
   libraryName: string,
@@ -53,6 +74,14 @@ export async function fetchLibraryDocumentation(
   let query;
   let queryParams;
 
+  const baseQueryFields = `
+    original_text,
+    title,
+    description,
+    content_type,
+    metadata
+  `;
+
   if (options.topic) {
     const { embedding } = await embed({
       model: openai.embedding('text-embedding-3-small'),
@@ -60,11 +89,11 @@ export async function fetchLibraryDocumentation(
     });
     query = `
       SELECT
-        original_text
+        ${baseQueryFields}
       FROM
         slop_embeddings
       WHERE
-        library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW')
+        library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
       ORDER BY
         embedding <=> $2
       LIMIT 10;
@@ -73,11 +102,11 @@ export async function fetchLibraryDocumentation(
   } else {
     query = `
       SELECT
-        original_text
+        ${baseQueryFields}
       FROM
         slop_embeddings
       WHERE
-        library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW');
+        library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example');
     `;
     queryParams = [context7CompatibleLibraryID];
   }
@@ -88,5 +117,25 @@ export async function fetchLibraryDocumentation(
     return 'No documentation found for this library.';
   }
 
-  return rows.map((row) => row.original_text).join('\n\n---\n\n');
+  const formattedResults = rows.map((row) => {
+    switch (row.content_type) {
+      case 'code-example':
+        return `
+### ${row.title || 'Code Example'}
+**Description:** ${row.description || 'N/A'}
+\`\`\`${row.metadata?.language || ''}
+${row.original_text}
+\`\`\`
+        `.trim();
+      case 'guide':
+        return `
+## ${row.title || 'Guide'}
+${row.original_text}
+        `.trim();
+      default:
+        return row.original_text;
+    }
+  });
+
+  return formattedResults.join('\n\n---\n\n');
 }

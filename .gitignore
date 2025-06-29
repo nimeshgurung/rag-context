@@ -62,3 +62,15 @@ dev-debug.log
 # OS specific
 .DS_Store
 prd.txt
+
+# Dependency directories
+node_modules/
+# Environment variables
+
+# Task files
+# tasks.json
+# tasks/
+.clinerules/
+.github/
+.trae/
+.windsurf/
