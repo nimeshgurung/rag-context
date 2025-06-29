@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import {
   searchLibraries,
@@ -12,7 +12,7 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
-app.get('/api/libraries', async (_req, res) => {
+app.get('/api/libraries', async (_req: Request, res: Response) => {
   try {
     const libraries = await getUniqueLibraries();
     res.json(libraries);
@@ -22,10 +22,11 @@ app.get('/api/libraries', async (_req, res) => {
   }
 });
 
-app.post('/api/search', async (req, res) => {
+app.post('/api/search', async (req: Request, res: Response) => {
   const { libraryName } = req.body;
   if (!libraryName) {
-    return res.status(400).json({ error: 'libraryName is required' });
+    res.status(400).json({ error: 'libraryName is required' });
+    return;
   }
   try {
     const results = await searchLibraries(libraryName);
@@ -36,10 +37,11 @@ app.post('/api/search', async (req, res) => {
   }
 });
 
-app.post('/api/docs', async (req, res) => {
+app.post('/api/docs', async (req: Request, res: Response) => {
   const { libraryId, topic } = req.body;
   if (!libraryId) {
-    return res.status(400).json({ error: 'libraryId is required' });
+    res.status(400).json({ error: 'libraryId is required' });
+    return;
   }
   try {
     const docs = await fetchLibraryDocumentation(libraryId, { topic });
