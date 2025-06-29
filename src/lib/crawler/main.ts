@@ -10,6 +10,15 @@ import { sendEvent } from '../events';
 
 const turndownService = new TurndownService();
 
+function getScopeGlob(url: string): string {
+  const urlObject = new URL(url);
+  // If the path is just '/', we don't want to add a trailing '/**'
+  // because it would match everything. Instead, we match the domain.
+  // For other paths, we append '/**' to scope to that path.
+  const path = urlObject.pathname === '/' ? '' : urlObject.pathname;
+  return `${urlObject.origin}${path}/**`;
+}
+
 export async function crawlSingleSource(
   jobId: string,
   source: WebScrapeSource,
@@ -21,6 +30,7 @@ export async function crawlSingleSource(
 
   const crawler = new PlaywrightCrawler({
     maxRequestsPerCrawl: maxDepth,
+    maxConcurrency: 1,
     async requestHandler({ request, page, enqueueLinks, log }) {
       log.info(`[Job ${jobId}] Processing: ${request.url}`);
       sendEvent(jobId, {
@@ -52,16 +62,28 @@ export async function crawlSingleSource(
         log.info(`No code snippets found on ${request.url}.`);
       }
 
-      const enrichmentPromises = rawCodeSnippets
-        .map((rawSnippet) => {
-          if (dedent(rawSnippet)) {
-            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown);
-          }
-          return null;
-        })
-        .filter((p): p is Promise<EnrichedItem> => p !== null);
+      const enrichmentConcurrency = 2; // Configurable concurrency limit
+      const enrichedData: EnrichedItem[] = [];
 
-      const enrichedData = await Promise.all(enrichmentPromises);
+      for (let i = 0; i < rawCodeSnippets.length; i += enrichmentConcurrency) {
+        const batch = rawCodeSnippets.slice(i, i + enrichmentConcurrency);
+        const batchPromises = batch.map((rawSnippet) => {
+          if (rawSnippet?.trim() !== '') {
+            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown).catch(
+              (e) => {
+                log.error(`Failed to enrich snippet: ${e}`);
+                return null;
+              },
+            );
+          }
+          return Promise.resolve(null);
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        enrichedData.push(
+          ...batchResults.filter((r): r is EnrichedItem => r !== null),
+        );
+      }
 
       if (enrichedData.length > 0) {
         await saveEnrichedData(
@@ -73,6 +95,7 @@ export async function crawlSingleSource(
 
       await enqueueLinks({
         selector: linkSelector || 'a',
+        globs: [getScopeGlob(request.url)],
         strategy: 'same-hostname',
       });
     },
@@ -135,8 +158,8 @@ export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
   );
 
   const crawler = new PlaywrightCrawler({
-    maxRequestsPerCrawl: maxDepth ? maxDepth : undefined,
-    maxConcurrency: 20,
+    maxRequestsPerCrawl: maxDepth ? maxDepth : 5,
+    maxConcurrency: 1,
     async requestHandler({ request, page, enqueueLinks, log }) {
       log.info(`Processing: ${request.url}`);
 
@@ -166,16 +189,28 @@ export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
         log.info(`No code snippets found on ${request.url}.`);
       }
 
-      const enrichmentPromises = rawCodeSnippets
-        .map((rawSnippet) => {
-          if (dedent(rawSnippet)) {
-            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown);
-          }
-          return null;
-        })
-        .filter((p): p is Promise<EnrichedItem> => p !== null);
+      const enrichmentConcurrency = 2; // Configurable concurrency limit
+      const enrichedData: EnrichedItem[] = [];
 
-      const enrichedData = await Promise.all(enrichmentPromises);
+      for (let i = 0; i < rawCodeSnippets.length; i += enrichmentConcurrency) {
+        const batch = rawCodeSnippets.slice(i, i + enrichmentConcurrency);
+        const batchPromises = batch.map((rawSnippet) => {
+          if (dedent(rawSnippet)) {
+            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown).catch(
+              (e) => {
+                log.error(`Failed to enrich snippet: ${e}`);
+                return null;
+              },
+            );
+          }
+          return Promise.resolve(null);
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        enrichedData.push(
+          ...batchResults.filter((r): r is EnrichedItem => r !== null),
+        );
+      }
 
       if (enrichedData.length > 0) {
         await saveEnrichedData(

@@ -64,9 +64,9 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
   const [scrapeLibraryName, setScrapeLibraryName] = useState('');
   const [scrapeDescription, setScrapeDescription] = useState('');
   const [startUrl, setStartUrl] = useState('');
-  const [contentSelector, setContentSelector] = useState('body');
-  const [linkSelector, setLinkSelector] = useState('a');
-  const [maxDepth, setMaxDepth] = useState<number | ''>(5);
+  const [contentSelector, setContentSelector] = useState('');
+  const [linkSelector, setLinkSelector] = useState('');
+  const [maxDepth, setMaxDepth] = useState<number | ''>('');
 
   useEffect(() => {
     if (!open) {
@@ -80,6 +80,9 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
       setScrapeLibraryName('');
       setScrapeDescription('');
       setStartUrl('');
+      setContentSelector('');
+      setLinkSelector('');
+      setMaxDepth('');
     }
   }, [open]);
 

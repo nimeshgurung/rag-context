@@ -27,7 +27,7 @@ You will be provided with the code snippet and the surrounding markdown content 
       "title": "Your Generated Title",
       "description": "Your generated description.",
       "language": "The programming language you identified",
-      "code": "Formatted code snippet with correct indentation and return it."
+      "formattedCode": "Formatted code snippet with correct indentation and return it."
     }`;
 
   const prompt = `**Context from Documentation Page:**
