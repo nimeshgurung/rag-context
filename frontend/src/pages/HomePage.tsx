@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Link, Typography, Box } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Link, Typography, Box, TextField } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { getLibraries } from '../services/api';
 
@@ -13,6 +13,7 @@ interface Library {
 const HomePage: React.FC = () => {
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const fetchLibraries = async () => {
@@ -30,13 +31,28 @@ const HomePage: React.FC = () => {
     fetchLibraries();
   }, []);
 
+  const filteredLibraries = libraries.filter(library =>
+    library.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    library.description.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h5" component="h1" gutterBottom>
-        Popular Libraries
+        Indexed Libraries and Documentation
       </Typography>
+      <Box sx={{ mb: 2, mt: 2, maxWidth: '400px'}}>
+        <TextField
+          fullWidth
+          label="Search Libraries"
+          variant="outlined"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size='small'
+        />
+      </Box>
       <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 650 }} aria-label="simple table">
+        <Table sx={{ width: '100%' }} aria-label="simple table">
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
@@ -50,7 +66,7 @@ const HomePage: React.FC = () => {
                 <TableCell colSpan={5} align="center">Loading...</TableCell>
               </TableRow>
             ) : (
-              libraries.map((row) => (
+              filteredLibraries.map((row) => (
               <TableRow
                 key={row.libraryId}
                 sx={{ '&:last-child td, &:last-child th': { border: 0 } }}

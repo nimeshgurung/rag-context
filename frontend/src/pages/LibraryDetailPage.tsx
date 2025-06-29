@@ -1,25 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Typography, TextField, Button, Paper, CircularProgress } from '@mui/material';
-import Markdown from 'markdown-to-jsx';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { fetchLibraryDocumentation } from '../services/api';
-
-const CodeSnippet = ({ className, children }: {className?: string, children: React.ReactNode}) => {
-  const match = /lang-(\w+)/.exec(className || '');
-  return match ? (
-    <SyntaxHighlighter
-      style={vscDarkPlus}
-      language={match[1]}
-      PreTag="div"
-    >
-      {String(children).replace(/\n$/, '')}
-    </SyntaxHighlighter>
-  ) : (
-    <code className={className}>{children}</code>
-  );
-};
 
 const LibraryDetailPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -59,15 +41,16 @@ const LibraryDetailPage: React.FC = () => {
         <Typography variant="h4">{id}</Typography>
       </Paper>
 
-      <Box sx={{ display: 'flex', mb: 2, gap: 1 }}>
+      <Box sx={{ display: 'flex', mb: 2, gap: 2 }}>
         <TextField
           fullWidth
           variant="outlined"
           placeholder="Show docs for... e.g. data fetching, routing, middleware"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
+          size='small'
         />
-        <Button variant="contained" onClick={handleSearch}>
+        <Button variant="contained" onClick={handleSearch} size='small' sx={{ minWidth: '160px' }}>
           Show Results
         </Button>
       </Box>
@@ -76,17 +59,18 @@ const LibraryDetailPage: React.FC = () => {
         {loading ? (
           <CircularProgress />
         ) : (
-          <Markdown
-            options={{
-              overrides: {
-                code: {
-                  component: CodeSnippet,
-                },
-              },
+          <TextField
+            fullWidth
+            multiline
+            value={documentation}
+            InputProps={{
+              readOnly: true,
+              style: {
+                fontFamily: 'monospace',
+              }
             }}
-          >
-            {documentation}
-          </Markdown>
+            rows={30}
+          />
         )}
       </Paper>
     </Box>

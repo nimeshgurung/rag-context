@@ -6,8 +6,80 @@ import { loadConfig } from './config';
 import { getEnrichedDataFromLLM } from './enrichment';
 import { saveEnrichedData } from './storage';
 import pool from '../db';
+import { WebScrapeSource } from '../types';
 
 const turndownService = new TurndownService();
+
+export async function crawlSingleSource(
+  source: WebScrapeSource,
+  libraryId: string,
+  libraryDescription: string,
+) {
+  const { startUrl, config } = source;
+  const { contentSelector, linkSelector, maxDepth } = config;
+
+  const crawler = new PlaywrightCrawler({
+    maxRequestsPerCrawl: maxDepth,
+    async requestHandler({ request, page, enqueueLinks, log }) {
+      log.info(`Processing: ${request.url}`);
+
+      const mainContentHTML = await page.evaluate((selector) => {
+        const el = document.querySelector(selector);
+        return el ? el.innerHTML : document.body.innerHTML;
+      }, contentSelector || 'main, article, .main-content, #main-content');
+
+      if (!mainContentHTML) {
+        log.warning(`No main content found on ${request.url}. Skipping.`);
+        return;
+      }
+
+      const contextMarkdown = turndownService.turndown(mainContentHTML);
+
+      const rawCodeSnippets = await page.evaluate(() => {
+        const snippets: string[] = [];
+        document.querySelectorAll('pre > code').forEach((codeElement) => {
+          snippets.push((codeElement as HTMLElement).textContent || '');
+        });
+        return snippets;
+      });
+
+      if (rawCodeSnippets.length === 0) {
+        log.info(`No code snippets found on ${request.url}.`);
+      }
+
+      const enrichmentPromises = rawCodeSnippets
+        .map((rawSnippet) => {
+          if (dedent(rawSnippet)) {
+            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown);
+          }
+          return null;
+        })
+        .filter((p): p is Promise<EnrichedItem> => p !== null);
+
+      const enrichedData = await Promise.all(enrichmentPromises);
+
+      if (enrichedData.length > 0) {
+        await saveEnrichedData(
+          enrichedData,
+          { libraryId, libraryName: source.name, libraryDescription },
+          request.url,
+        );
+      }
+
+      await enqueueLinks({
+        selector: linkSelector || 'a',
+        strategy: 'same-hostname',
+      });
+    },
+    failedRequestHandler({ request, log }) {
+      log.error(`Request ${request.url} failed and will not be retried.`);
+    },
+  });
+
+  console.log(`Starting crawl for ${libraryId} at ${startUrl}...`);
+  await crawler.run([startUrl]);
+  console.log(`Crawl for ${libraryId} finished successfully.`);
+}
 
 export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
   const config = await loadConfig();

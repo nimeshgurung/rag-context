@@ -34,3 +34,25 @@ export interface EnrichedItem {
   code: string;
   language: string;
 }
+
+export type ApiSpecSource = {
+  type: 'api-spec';
+  name: string;
+  description: string;
+  sourceType: 'file' | 'text';
+  content: string;
+};
+
+export type WebScrapeSource = {
+  type: 'web-scrape';
+  name: string;
+  description: string;
+  startUrl: string;
+  config: {
+    contentSelector?: string;
+    linkSelector?: string;
+    maxDepth?: number;
+  };
+};
+
+export type DocumentationSource = ApiSpecSource | WebScrapeSource;
