@@ -1,7 +1,7 @@
 import pool from '../db';
 import { EnrichedItem } from '../types';
 import { createHash } from 'crypto';
-import { embedMany } from 'ai';
+import { embed, embedMany } from 'ai';
 import { openai } from '../api';
 
 function generateDeterministicId(
@@ -22,7 +22,13 @@ export async function saveEnrichedData(
   },
   sourceUrl: string,
 ) {
-  const { embeddings } = await embedMany({
+  const libraryEmbeddingText = `${libraryInfo.libraryName}: ${libraryInfo.libraryDescription}`;
+  const { embedding: libraryEmbedding } = await embed({
+    model: openai.embedding('text-embedding-3-small'),
+    value: libraryEmbeddingText,
+  });
+
+  const { embeddings: chunkEmbeddings } = await embedMany({
     model: openai.embedding('text-embedding-3-small'),
     values: data.map((item) => item.code),
   });
@@ -33,14 +39,18 @@ export async function saveEnrichedData(
 
     // First, ensure the library exists in the 'libraries' table.
     const libraryInsertQuery = `
-      INSERT INTO libraries (id, name, description)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (id) DO NOTHING;
+      INSERT INTO libraries (id, name, description, embedding)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        embedding = EXCLUDED.embedding;
     `;
     await client.query(libraryInsertQuery, [
       libraryInfo.libraryId,
       libraryInfo.libraryName,
       libraryInfo.libraryDescription,
+      `[${libraryEmbedding.join(',')}]`,
     ]);
 
     // Get existing vector IDs for this library and source URL
@@ -61,7 +71,7 @@ export async function saveEnrichedData(
       );
       currentIds.add(vectorId);
 
-      const embedding = embeddings[data.indexOf(item)];
+      const embedding = chunkEmbeddings[data.indexOf(item)];
 
       const query = `
         INSERT INTO slop_embeddings (vector_id, library_id, content_type, title, description, original_text, embedding, metadata)

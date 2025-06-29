@@ -3,7 +3,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { Pool } from 'pg';
 import { convertToSlopChunks } from '../src/slop/converter';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { embedMany } from 'ai';
+import { embed, embedMany } from 'ai';
 import { OpenAPIV3 } from 'openapi-types';
 
 async function main() {
@@ -63,7 +63,13 @@ async function main() {
 
       console.log(`Generated ${chunks.length} chunks for ${libraryId}.`);
 
-      const { embeddings } = await embedMany({
+      const libraryEmbeddingText = `${spec.info.title}: ${apiInfo.description}`;
+      const { embedding: libraryEmbedding } = await embed({
+        model: openai.embedding('text-embedding-3-small'),
+        value: libraryEmbeddingText,
+      });
+
+      const { embeddings: chunkEmbeddings } = await embedMany({
         model: openai.embedding('text-embedding-3-small'),
         values: chunks.map((chunk) => chunk.originalText),
       });
@@ -75,19 +81,23 @@ async function main() {
 
         // Insert library metadata into the new 'libraries' table
         const libraryInsertQuery = `
-          INSERT INTO libraries (id, name, description)
-          VALUES ($1, $2, $3)
-          ON CONFLICT (id) DO NOTHING;
+          INSERT INTO libraries (id, name, description, embedding)
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            description = EXCLUDED.description,
+            embedding = EXCLUDED.embedding;
         `;
         await client.query(libraryInsertQuery, [
           libraryId,
           spec.info.title,
           apiInfo.description,
+          `[${libraryEmbedding.join(',')}]`,
         ]);
 
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          const embedding = embeddings[i];
+          const embedding = chunkEmbeddings[i];
 
           const query = `
             INSERT INTO slop_embeddings (vector_id, library_id, content_type, original_text, embedding, metadata)

@@ -30,15 +30,6 @@ export async function generateObjectFromPrompt<T extends z.ZodTypeAny>({
   return object;
 }
 
-// Initialize PostgreSQL client pool
-// const pool = new Pool({
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD,
-//   database: process.env.DB_NAME,
-//   host: process.env.DB_HOST || 'db',
-//   port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
-// });
-
 export async function searchLibraries(
   libraryName: string,
 ): Promise<LibrarySearchResult[]> {
@@ -48,21 +39,52 @@ export async function searchLibraries(
   });
 
   const query = `
+    WITH vector_search AS (
+      SELECT
+        id,
+        1 - (embedding <=> $1) as similarity_score
+      FROM
+        libraries
+      ORDER BY
+        similarity_score DESC
+      LIMIT 10
+    ),
+    keyword_search AS (
+      SELECT
+        id,
+        ts_rank(fts, plainto_tsquery('english', $2)) as keyword_score
+      FROM
+        libraries
+      WHERE
+        fts @@ plainto_tsquery('english', $2)
+      ORDER BY
+        keyword_score DESC
+      LIMIT 10
+    )
     SELECT
-      library_id as "libraryId",
-      metadata->>'title' as name,
-      metadata->>'description' as description,
-      1 - (embedding <=> $1) as "similarityScore"
+      l.id as "libraryId",
+      l.name,
+      l.description,
+      COALESCE(vs.similarity_score, 0) as "similarityScore",
+      COALESCE(ks.keyword_score, 0) as "keywordScore",
+      (COALESCE(vs.similarity_score, 0) * 0.7 + COALESCE(ks.keyword_score, 0) * 0.3) as "hybridScore"
     FROM
-      slop_embeddings
+      libraries l
+    LEFT JOIN
+      vector_search vs ON l.id = vs.id
+    LEFT JOIN
+      keyword_search ks ON l.id = ks.id
     WHERE
-      content_type = 'API_OVERVIEW'
+      l.id IN (SELECT id FROM vector_search UNION SELECT id FROM keyword_search)
     ORDER BY
-      "similarityScore" DESC
+      "hybridScore" DESC
     LIMIT 5;
   `;
 
-  const { rows } = await pool.query(query, [`[${embedding.join(',')}]`]);
+  const { rows } = await pool.query(query, [
+    `[${embedding.join(',')}]`,
+    libraryName,
+  ]);
 
   return rows;
 }
@@ -86,11 +108,9 @@ export async function fetchLibraryDocumentation(
     se.original_text,
     se.title,
     se.description,
-    content_type,
-    metadata
+    se.content_type,
+    se.metadata
   `;
-
-  console.warn('options', options);
 
   if (options.topic) {
     const { embedding } = await embed({
@@ -150,7 +170,7 @@ export async function fetchLibraryDocumentation(
       SELECT
         ${baseQueryFields}
       FROM
-        slop_embeddings
+        slop_embeddings se
       WHERE
         library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example');
     `;
