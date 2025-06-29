@@ -27,7 +27,10 @@ async function main() {
   });
 
   // 2. Define API Sources
-  const internalApiSources: Record<string, { url: string; description: string }> = {
+  const internalApiSources: Record<
+    string,
+    { url: string; description: string }
+  > = {
     'billing-api-v1': {
       url: './sample-specs/billing-api-v1.yaml',
       description: 'Manages customer billing and invoices.',
@@ -110,14 +113,15 @@ async function main() {
         }
 
         await client.query('COMMIT');
-        console.log(`Successfully embedded and stored ${chunks.length} vectors for ${libraryId}.`);
+        console.log(
+          `Successfully embedded and stored ${chunks.length} vectors for ${libraryId}.`,
+        );
       } catch (e) {
         await client.query('ROLLBACK');
         throw e; // Re-throw the error to be caught by the outer catch block
       } finally {
         client.release(); // Release the client back to the pool
       }
-
     } catch (error) {
       console.error(`Failed to process ${libraryId}:`, error);
     }
