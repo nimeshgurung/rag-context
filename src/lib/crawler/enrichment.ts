@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import dedent from 'dedent';
 import { generateObjectFromPrompt } from '../api';
 import { EnrichedItem } from '../types';
 
@@ -22,10 +21,13 @@ You will be provided with the code snippet and the surrounding markdown content 
 2.  **Analyze the Context:** Read the surrounding markdown to understand the broader context. The title and description should be relevant to this context.
 3.  **Generate Title:** Create a short, descriptive title (5-10 words). The title should be easy to understand and should summarize the main purpose of the code.
 4.  **Generate Description:** Write a brief description (1-3 sentences). The description should explain what the code does and how it relates to the documentation's topic. Mention any important functions, classes, or concepts demonstrated.
-5.  **Output Format:** Respond with a JSON object with the following structure:
+5.  **Identify Language:** Determine the programming language of the snippet (e.g., "typescript", "javascript", "python").
+6.  **Output Format:** Respond with a JSON object with the following structure:
     {
       "title": "Your Generated Title",
-      "description": "Your generated description."
+      "description": "Your generated description.",
+      "language": "The programming language you identified",
+      "code": "Formatted code snippet with correct indentation and return it."
     }`;
 
   const prompt = `**Context from Documentation Page:**
@@ -44,8 +46,10 @@ ${code}
     schema: z.object({
       title: z.string(),
       description: z.string(),
+      language: z.string(),
+      formattedCode: z.string(),
     }),
   });
 
-  return { ...object, code: dedent(code), language: 'javascript' };
+  return { ...object, code: object.formattedCode };
 }

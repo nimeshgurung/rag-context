@@ -2,6 +2,8 @@
   "libraries": [
     {
       "libraryId": "/crawlee/crawlee",
+      "name": "Crawlee",
+      "description": "Crawlee is a framework for building web crawlers.",
       "sources": [
         {
           "type": "web",

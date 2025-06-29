@@ -3,8 +3,6 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { Pool } from 'pg';
 import { convertToSlopChunks } from '../src/slop/converter';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { readFile } from 'fs/promises';
-import { join } from 'path';
 import { embedMany } from 'ai';
 import { OpenAPIV3 } from 'openapi-types';
 
@@ -71,6 +69,18 @@ async function main() {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+
+        // Insert library metadata into the new 'libraries' table
+        const libraryInsertQuery = `
+          INSERT INTO libraries (id, name, description)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (id) DO NOTHING;
+        `;
+        await client.query(libraryInsertQuery, [
+          libraryId,
+          spec.info.title,
+          apiInfo.description,
+        ]);
 
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];

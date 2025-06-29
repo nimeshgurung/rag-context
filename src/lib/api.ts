@@ -67,6 +67,13 @@ export async function searchLibraries(
   return rows;
 }
 
+export async function getUniqueLibraries(): Promise<LibrarySearchResult[]> {
+  const query =
+    'SELECT id as "libraryId", name, description FROM libraries ORDER BY name ASC;';
+  const { rows } = await pool.query(query);
+  return rows;
+}
+
 export async function fetchLibraryDocumentation(
   context7CompatibleLibraryID: string,
   options: { tokens?: number; topic?: string } = {},
@@ -82,6 +89,8 @@ export async function fetchLibraryDocumentation(
     metadata
   `;
 
+  console.warn('options', options);
+
   if (options.topic) {
     const { embedding } = await embed({
       model: openai.embedding('text-embedding-3-small'),
@@ -89,13 +98,14 @@ export async function fetchLibraryDocumentation(
     });
     query = `
       SELECT
-        ${baseQueryFields}
+        ${baseQueryFields},
+        1 - (embedding <=> $2) as "similarityScore"
       FROM
         slop_embeddings
       WHERE
         library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
       ORDER BY
-        embedding <=> $2
+        "similarityScore" DESC
       LIMIT 10;
     `;
     queryParams = [context7CompatibleLibraryID, `[${embedding.join(',')}]`];
@@ -121,11 +131,11 @@ export async function fetchLibraryDocumentation(
     switch (row.content_type) {
       case 'code-example':
         return `
-### ${row.title || 'Code Example'}
-**Description:** ${row.description || 'N/A'}
+### ${row.title || 'Code Example'} \n\n
+**Description:** ${row.description || 'N/A'} \n\n
 \`\`\`${row.metadata?.language || ''}
 ${row.original_text}
-\`\`\`
+\`\`\` \n\n
         `.trim();
       case 'guide':
         return `

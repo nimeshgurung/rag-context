@@ -3,7 +3,7 @@
   "retiredSessionsCount": 0,
   "sessions": [
     {
-      "id": "session_2x0LeeXarj",
+      "id": "session_WJ8SzzAxaW",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -16,14 +16,14 @@
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-06-29T06:50:18.744Z",
-      "createdAt": "2025-06-29T06:00:18.744Z",
+      "expiresAt": "2025-06-29T15:13:23.426Z",
+      "createdAt": "2025-06-29T14:23:23.426Z",
       "usageCount": 0,
       "maxUsageCount": 50,
       "errorScore": 0
     },
     {
-      "id": "session_1V15k5Ob6x",
+      "id": "session_TrUhOQipEx",
       "cookieJar": {
         "version": "tough-cookie@5.1.2",
         "storeType": "MemoryCookieStore",
@@ -33,183 +33,193 @@
         "prefixSecurity": "silent",
         "cookies": [
           {
+            "key": "_ga_1MGJDMV8DX",
+            "value": "GS2.1.s1751207005$o1$g0$t1751207005$j60$l0$h0",
+            "expires": "2026-08-03T14:23:25.928Z",
+            "domain": "crawlee.dev",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-06-29T14:23:28.209Z",
+            "lastAccessed": "2025-06-29T14:23:28.209Z"
+          },
+          {
+            "key": "_ga",
+            "value": "GA1.1.2112156044.1751207006",
+            "expires": "2026-08-03T14:23:27.476Z",
+            "domain": "crawlee.dev",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-06-29T14:23:28.210Z",
+            "lastAccessed": "2025-06-29T14:23:28.210Z"
+          },
+          {
             "key": "_rdt_uuid",
-            "value": "1751176821347.82f1288f-1638-420a-8835-6a2932c0b312",
-            "expires": "2025-09-27T06:00:21.000Z",
+            "value": "1751207005965.a7d846f8-ea93-44d3-9798-fe76603f6b8c",
+            "expires": "2025-09-27T14:23:25.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "secure": true,
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.229Z",
-            "lastAccessed": "2025-06-29T06:00:22.229Z"
-          },
-          {
-            "key": "_ga_1MGJDMV8DX",
-            "value": "GS2.1.s1751176821$o1$g0$t1751176821$j60$l0$h0",
-            "expires": "2026-08-03T06:00:21.413Z",
-            "domain": "crawlee.dev",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.229Z",
-            "lastAccessed": "2025-06-29T06:00:22.229Z"
-          },
-          {
-            "key": "_ga",
-            "value": "GA1.1.315599551.1751176821",
-            "expires": "2026-08-03T06:00:21.795Z",
-            "domain": "crawlee.dev",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.229Z",
-            "lastAccessed": "2025-06-29T06:00:22.229Z"
+            "creation": "2025-06-29T14:23:28.210Z",
+            "lastAccessed": "2025-06-29T14:23:28.210Z"
           },
           {
             "key": "_uetsid",
-            "value": "575ebda054ae11f08c5145fc37c4bfec",
-            "expires": "2025-06-30T06:00:21.000Z",
+            "value": "9ebfc06054f411f098778b8d8710fc0b",
+            "expires": "2025-06-30T14:23:26.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.230Z",
-            "lastAccessed": "2025-06-29T06:00:22.230Z"
+            "creation": "2025-06-29T14:23:28.210Z",
+            "lastAccessed": "2025-06-29T14:23:28.210Z"
           },
           {
             "key": "_uetvid",
-            "value": "575ee28054ae11f0bd0625f631059438",
-            "expires": "2026-07-24T06:00:21.000Z",
+            "value": "9ebfd41054f411f0972295b998460db1",
+            "expires": "2026-07-24T14:23:26.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.230Z",
-            "lastAccessed": "2025-06-29T06:00:22.230Z"
+            "creation": "2025-06-29T14:23:28.210Z",
+            "lastAccessed": "2025-06-29T14:23:28.210Z"
           },
           {
             "key": "_tt_enable_cookie",
             "value": "1",
-            "expires": "2025-09-27T06:00:21.000Z",
+            "expires": "2025-09-27T14:23:26.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.230Z",
-            "lastAccessed": "2025-06-29T06:00:22.230Z"
+            "creation": "2025-06-29T14:23:28.210Z",
+            "lastAccessed": "2025-06-29T14:23:28.210Z"
           },
           {
             "key": "_ttp",
-            "value": "01JYX4BETSE7GCCF8CF2BHSSH4_.tt.1",
-            "expires": "2025-09-27T06:00:21.000Z",
+            "value": "01JYY14M0Y5P5363N6G135Q8PV_.tt.1",
+            "expires": "2025-09-27T14:23:26.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.230Z",
-            "lastAccessed": "2025-06-29T06:00:22.230Z"
+            "creation": "2025-06-29T14:23:28.210Z",
+            "lastAccessed": "2025-06-29T14:23:28.210Z"
           },
           {
             "key": "ttcsid",
-            "value": "1751176821596::4DVFhyNaEAEcMIUevZuE.1.1751176821596",
-            "expires": "2025-09-27T06:00:21.000Z",
+            "value": "1751207006242::iQOKcfLkCKq3ddn0VVfV.1.1751207006242",
+            "expires": "2025-09-27T14:23:26.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.230Z",
-            "lastAccessed": "2025-06-29T06:00:22.230Z"
-          },
-          {
-            "key": "_gcl_au",
-            "value": "1.1.1896975940.1751176822",
-            "expires": "2025-09-27T06:00:22.000Z",
-            "domain": "crawlee.dev",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
-          },
-          {
-            "key": "_clck",
-            "value": "1mvss12%7C2%7Cfx6%7C0%7C2006",
-            "expires": "2026-06-29T06:00:21.000Z",
-            "domain": "crawlee.dev",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
-          },
-          {
-            "key": "_ga_TLBRR75MMQ",
-            "value": "GS2.1.s1751176821$o1$g0$t1751176821$j60$l0$h0",
-            "expires": "2026-08-03T06:00:21.795Z",
-            "domain": "crawlee.dev",
-            "path": "/",
-            "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
+            "creation": "2025-06-29T14:23:28.210Z",
+            "lastAccessed": "2025-06-29T14:23:28.210Z"
           },
           {
             "key": "ttcsid_CQHNEL3C77U08RGLR00G",
-            "value": "1751176821596::GTLwTtnVQDOVHL-wSnZr.1.1751176821944",
-            "expires": "2025-09-27T06:00:21.000Z",
+            "value": "1751207006242::XxPpjjYYjfYrNn-WqX95.1.1751207006528",
+            "expires": "2025-09-27T14:23:26.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
+            "creation": "2025-06-29T14:23:28.211Z",
+            "lastAccessed": "2025-06-29T14:23:28.211Z"
+          },
+          {
+            "key": "_clck",
+            "value": "14dj83p%7C2%7Cfx6%7C0%7C2006",
+            "expires": "2026-06-29T14:23:26.000Z",
+            "domain": "crawlee.dev",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-06-29T14:23:28.211Z",
+            "lastAccessed": "2025-06-29T14:23:28.211Z"
+          },
+          {
+            "key": "_gcl_au",
+            "value": "1.1.474923570.1751207007",
+            "expires": "2025-09-27T14:23:26.000Z",
+            "domain": "crawlee.dev",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-06-29T14:23:28.211Z",
+            "lastAccessed": "2025-06-29T14:23:28.211Z"
           },
           {
             "key": "ajs_anonymous_id",
-            "value": "7c91ad6b-c83f-42d1-a7fc-6788d0b8de0a",
-            "expires": "2026-06-29T06:00:22.000Z",
+            "value": "cff96b14-c3fe-4ca1-af10-4b2b8df33e0a",
+            "expires": "2026-06-29T14:23:27.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
+            "creation": "2025-06-29T14:23:28.212Z",
+            "lastAccessed": "2025-06-29T14:23:28.212Z"
+          },
+          {
+            "key": "_clsk",
+            "value": "f2nzhy%7C1751207007302%7C1%7C1%7Ce.clarity.ms%2Fcollect",
+            "expires": "2025-06-30T14:23:27.000Z",
+            "domain": "crawlee.dev",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-06-29T14:23:28.212Z",
+            "lastAccessed": "2025-06-29T14:23:28.212Z"
+          },
+          {
+            "key": "_ga_TLBRR75MMQ",
+            "value": "GS2.1.s1751207007$o1$g0$t1751207007$j60$l0$h0",
+            "expires": "2026-08-03T14:23:27.475Z",
+            "domain": "crawlee.dev",
+            "path": "/",
+            "hostOnly": false,
+            "creation": "2025-06-29T14:23:28.212Z",
+            "lastAccessed": "2025-06-29T14:23:28.212Z"
           },
           {
             "key": "__hstc",
-            "value": "7591405.c1d20e102ea17da366df44974248bccc.1751176822218.1751176822218.1751176822218.1",
-            "expires": "2025-12-26T06:00:22.000Z",
+            "value": "7591405.db0d70a16f75a744a168c6418dea996b.1751207008196.1751207008196.1751207008196.1",
+            "expires": "2025-12-26T14:23:28.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
+            "creation": "2025-06-29T14:23:28.212Z",
+            "lastAccessed": "2025-06-29T14:23:28.212Z"
           },
           {
             "key": "hubspotutk",
-            "value": "c1d20e102ea17da366df44974248bccc",
-            "expires": "2025-12-26T06:00:22.000Z",
+            "value": "db0d70a16f75a744a168c6418dea996b",
+            "expires": "2025-12-26T14:23:28.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
+            "creation": "2025-06-29T14:23:28.212Z",
+            "lastAccessed": "2025-06-29T14:23:28.212Z"
           },
           {
             "key": "__hssrc",
             "value": "1",
-            "expires": "2025-06-29T06:50:22.228Z",
+            "expires": "2025-06-29T15:13:28.208Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
+            "creation": "2025-06-29T14:23:28.212Z",
+            "lastAccessed": "2025-06-29T14:23:28.212Z"
           },
           {
             "key": "__hssc",
-            "value": "7591405.1.1751176822218",
-            "expires": "2025-06-29T06:30:22.000Z",
+            "value": "7591405.1.1751207008196",
+            "expires": "2025-06-29T14:53:28.000Z",
             "domain": "crawlee.dev",
             "path": "/",
             "hostOnly": false,
-            "creation": "2025-06-29T06:00:22.231Z",
-            "lastAccessed": "2025-06-29T06:00:22.231Z"
+            "creation": "2025-06-29T14:23:28.212Z",
+            "lastAccessed": "2025-06-29T14:23:28.212Z"
           }
         ]
       },
       "userData": {},
       "maxErrorScore": 3,
       "errorScoreDecrement": 0.5,
-      "expiresAt": "2025-06-29T06:50:18.747Z",
-      "createdAt": "2025-06-29T06:00:18.747Z",
+      "expiresAt": "2025-06-29T15:13:23.429Z",
+      "createdAt": "2025-06-29T14:23:23.429Z",
       "usageCount": 1,
       "maxUsageCount": 50,
       "errorScore": 0

@@ -19,6 +19,8 @@ export interface DocsSource {
 
 export interface LibraryConfig {
   libraryId: string;
+  name: string;
+  description: string;
   sources: DocsSource[];
 }
 

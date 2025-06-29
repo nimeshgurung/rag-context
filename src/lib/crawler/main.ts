@@ -11,25 +11,32 @@ const turndownService = new TurndownService();
 
 export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
   const config = await loadConfig();
-  const webSourcesWithLibId = config.libraries.flatMap((lib) =>
+  const webSourcesWithLibInfo = config.libraries.flatMap((lib) =>
     lib.sources
       .filter((source) => source.type === 'web' && source.rootUrl)
-      .map((source) => ({ ...source, libraryId: lib.libraryId })),
+      .map((source) => ({
+        ...source,
+        libraryId: lib.libraryId,
+        libraryName: lib.name,
+        libraryDescription: lib.description,
+      })),
   );
 
-  if (webSourcesWithLibId.length === 0) {
+  if (webSourcesWithLibInfo.length === 0) {
     console.error('No web sources found in the configuration.');
     return;
   }
 
-  const startRequests = webSourcesWithLibId.map((s) => ({
+  const startRequests = webSourcesWithLibInfo.map((s) => ({
     url: s.rootUrl as string,
     userData: {
       libraryId: s.libraryId,
+      libraryName: s.libraryName,
+      libraryDescription: s.libraryDescription,
     },
   }));
 
-  const allGlobs = webSourcesWithLibId.flatMap(
+  const allGlobs = webSourcesWithLibInfo.flatMap(
     (source) =>
       source.scope?.map((pattern) => {
         const trimmedRoot = source.rootUrl!.endsWith('/')
@@ -65,7 +72,7 @@ export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
       const rawCodeSnippets = await page.evaluate(() => {
         const snippets: string[] = [];
         document.querySelectorAll('pre > code').forEach((codeElement) => {
-          snippets.push(codeElement.textContent || '');
+          snippets.push((codeElement as HTMLElement).textContent || '');
         });
         return snippets;
       });
@@ -76,9 +83,8 @@ export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
 
       const enrichmentPromises = rawCodeSnippets
         .map((rawSnippet) => {
-          const cleanCode = dedent(rawSnippet);
-          if (cleanCode) {
-            return getEnrichedDataFromLLM(cleanCode, contextMarkdown);
+          if (dedent(rawSnippet)) {
+            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown);
           }
           return null;
         })
@@ -89,7 +95,11 @@ export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
       if (enrichedData.length > 0) {
         await saveEnrichedData(
           enrichedData,
-          request.userData.libraryId,
+          {
+            libraryId: request.userData.libraryId,
+            libraryName: request.userData.libraryName,
+            libraryDescription: request.userData.libraryDescription,
+          },
           request.url,
         );
       }

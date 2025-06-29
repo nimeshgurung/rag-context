@@ -1,6 +1,6 @@
 {
 	"id": "TibeB9Ktu9QwYTj",
-	"json": "{\"id\":\"TibeB9Ktu9QwYTj\",\"url\":\"https://crawlee.dev/docs\",\"loadedUrl\":\"https://crawlee.dev/js/docs/quick-start\",\"uniqueKey\":\"https://crawlee.dev/docs\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"libraryId\":\"/crawlee/crawlee\",\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-06-29T06:00:26.404Z\"}",
+	"json": "{\"id\":\"TibeB9Ktu9QwYTj\",\"url\":\"https://crawlee.dev/docs\",\"loadedUrl\":\"https://crawlee.dev/js/docs/quick-start\",\"uniqueKey\":\"https://crawlee.dev/docs\",\"method\":\"GET\",\"noRetry\":false,\"retryCount\":0,\"errorMessages\":[],\"headers\":{},\"userData\":{\"libraryId\":\"/crawlee/crawlee\",\"libraryName\":\"Crawlee\",\"libraryDescription\":\"Crawlee is a framework for building web crawlers.\",\"__crawlee\":{\"state\":4}},\"handledAt\":\"2025-06-29T14:23:36.259Z\"}",
 	"method": "GET",
 	"orderNo": null,
 	"retryCount": 0,
