@@ -1,6 +1,19 @@
+-- Drop existing tables to ensure a clean slate
+DROP TABLE IF EXISTS slop_embeddings;
+DROP TABLE IF EXISTS libraries;
+
+-- Ensure the vector extension is available
 CREATE EXTENSION IF NOT EXISTS vector;
 
-CREATE TABLE IF NOT EXISTS slop_embeddings (
+-- Create the 'libraries' table
+CREATE TABLE libraries (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT
+);
+
+-- Create the 'slop_embeddings' table
+CREATE TABLE slop_embeddings (
   vector_id TEXT PRIMARY KEY,
   library_id TEXT NOT NULL,
   content_type TEXT NOT NULL,
@@ -8,12 +21,18 @@ CREATE TABLE IF NOT EXISTS slop_embeddings (
   description TEXT,
   original_text TEXT NOT NULL,
   embedding VECTOR(1536),
-  metadata JSONB
+  metadata JSONB,
+  fts tsvector GENERATED ALWAYS AS (to_tsvector('english', original_text)) STORED,
+  CONSTRAINT fk_library
+    FOREIGN KEY(library_id)
+    REFERENCES libraries(id)
+    ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_library_id ON slop_embeddings (library_id);
-
-CREATE INDEX IF NOT EXISTS idx_embedding ON slop_embeddings USING hnsw (embedding vector_cosine_ops);
+-- Create indexes for performance
+CREATE INDEX slop_embeddings_fts_idx ON slop_embeddings USING GIN(fts);
+CREATE INDEX idx_slop_library_id ON slop_embeddings (library_id);
+CREATE INDEX idx_slop_embedding ON slop_embeddings USING hnsw (embedding vector_cosine_ops);
 
 -- Add title and description columns if they don't exist
 ALTER TABLE slop_embeddings

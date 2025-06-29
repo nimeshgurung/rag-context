@@ -1,32 +1,31 @@
 import 'dotenv/config';
 import { Pool } from 'pg';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-async function clearDatabase() {
-  const connectionString = process.env.POSTGRES_CONNECTION_STRING;
-  if (!connectionString) {
-    throw new Error('POSTGRES_CONNECTION_STRING is not set in .env file');
+async function clearAndSetupDatabase() {
+  const postgresConnectionString = process.env.POSTGRES_CONNECTION_STRING;
+  if (!postgresConnectionString) {
+    throw new Error(
+      'POSTGRES_CONNECTION_STRING is not defined in environment variables.',
+    );
   }
 
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({ connectionString: postgresConnectionString });
   const client = await pool.connect();
 
-  console.log('Connecting to the database to clear tables...');
-
   try {
-    await client.query('BEGIN');
-
-    // Use DROP TABLE IF EXISTS to completely remove the tables.
-    // CASCADE will remove any dependent objects.
-    console.log('Dropping tables: libraries, slop_embeddings...');
-    await client.query('DROP TABLE IF EXISTS slop_embeddings CASCADE;');
-    await client.query('DROP TABLE IF EXISTS libraries CASCADE;');
-
-    await client.query('COMMIT');
-    console.log('Database tables dropped successfully.');
+    console.log('Connected to the database. Running setup script...');
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const setupSql = fs.readFileSync(
+      path.join(__dirname, 'create_table.sql'),
+      'utf8',
+    );
+    await client.query(setupSql);
+    console.log('Database setup complete. Tables are created and ready.');
   } catch (error) {
-    await client.query('ROLLBACK');
-    console.error('Error clearing database tables:', error);
-    throw error;
+    console.error('Failed to setup database:', error);
   } finally {
     client.release();
     await pool.end();
@@ -34,7 +33,4 @@ async function clearDatabase() {
   }
 }
 
-clearDatabase().catch((error) => {
-  console.error('An error occurred during the database clearing process:', error);
-  process.exit(1);
-});
+clearAndSetupDatabase();

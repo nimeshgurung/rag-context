@@ -82,9 +82,10 @@ export async function fetchLibraryDocumentation(
   let queryParams;
 
   const baseQueryFields = `
-    original_text,
-    title,
-    description,
+    se.vector_id,
+    se.original_text,
+    se.title,
+    se.description,
     content_type,
     metadata
   `;
@@ -97,18 +98,53 @@ export async function fetchLibraryDocumentation(
       value: options.topic,
     });
     query = `
+      WITH vector_search AS (
+        SELECT
+          vector_id,
+          1 - (embedding <=> $2) as similarity_score
+        FROM
+          slop_embeddings
+        WHERE
+          library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
+        ORDER BY
+          similarity_score DESC
+        LIMIT 20
+      ),
+      keyword_search AS (
+        SELECT
+          vector_id,
+          ts_rank(fts, plainto_tsquery('english', $3)) as keyword_score
+        FROM
+          slop_embeddings
+        WHERE
+          library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
+          AND fts @@ plainto_tsquery('english', $3)
+        ORDER BY
+          keyword_score DESC
+        LIMIT 20
+      )
       SELECT
         ${baseQueryFields},
-        1 - (embedding <=> $2) as "similarityScore"
+        COALESCE(vs.similarity_score, 0) as "similarityScore",
+        COALESCE(ks.keyword_score, 0) as "keywordScore",
+        (COALESCE(vs.similarity_score, 0) * 0.7 + COALESCE(ks.keyword_score, 0) * 0.3) as "hybridScore"
       FROM
-        slop_embeddings
+        slop_embeddings se
+      LEFT JOIN
+        vector_search vs ON se.vector_id = vs.vector_id
+      LEFT JOIN
+        keyword_search ks ON se.vector_id = ks.vector_id
       WHERE
-        library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
+        se.vector_id IN (SELECT vector_id FROM vector_search UNION SELECT vector_id FROM keyword_search)
       ORDER BY
-        "similarityScore" DESC
-      LIMIT 10;
+        "hybridScore" DESC
+      LIMIT 5;
     `;
-    queryParams = [context7CompatibleLibraryID, `[${embedding.join(',')}]`];
+    queryParams = [
+      context7CompatibleLibraryID,
+      `[${embedding.join(',')}]`,
+      options.topic,
+    ];
   } else {
     query = `
       SELECT
