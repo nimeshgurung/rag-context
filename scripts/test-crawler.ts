@@ -1,4 +1,4 @@
-import { startCrawl } from '../src/lib/crawler/main';
+import { startCrawl } from '../src/lib/crawl/worker';
 
 async function run() {
   try {

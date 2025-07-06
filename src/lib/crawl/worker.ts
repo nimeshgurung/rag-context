@@ -1,10 +1,9 @@
 import { PlaywrightCrawler } from 'crawlee';
 import TurndownService from 'turndown';
 import dedent from 'dedent';
-import { EnrichedItem, WebScrapeSource } from '../types';
+import { WebScrapeSource } from '../types';
 import { loadConfig } from './config';
-import { getEnrichedDataFromLLM } from './enrichment';
-import { saveEnrichedData } from './storage';
+import { enqueueEmbeddingJobs, EmbeddingJobPayload } from '../jobs/storage';
 import pool from '../db';
 import { sendEvent } from '../events';
 
@@ -12,11 +11,23 @@ const turndownService = new TurndownService();
 
 function getScopeGlob(url: string): string {
   const urlObject = new URL(url);
+
+  let path;
+  if (urlObject.hash && urlObject.hash.length > 1) {
+    let hashPath = urlObject.hash.substring(1);
+    if (!hashPath.startsWith('/')) {
+      hashPath = `/${hashPath}`;
+    }
+    path = hashPath;
+  } else {
+    path = urlObject.pathname;
+  }
+
   // If the path is just '/', we don't want to add a trailing '/**'
   // because it would match everything. Instead, we match the domain.
   // For other paths, we append '/**' to scope to that path.
-  const path = urlObject.pathname === '/' ? '' : urlObject.pathname;
-  return `${urlObject.origin}${path}/**`;
+  const finalPath = path === '/' ? '' : path;
+  return `${urlObject.origin}${finalPath}/**`;
 }
 
 export async function crawlSingleSource(
@@ -27,6 +38,8 @@ export async function crawlSingleSource(
 ) {
   const { startUrl, config } = source;
   const { contentSelector, linkSelector, maxDepth } = config;
+
+  const scopeGlob = getScopeGlob(startUrl);
 
   const crawler = new PlaywrightCrawler({
     maxRequestsPerCrawl: maxDepth,
@@ -60,42 +73,30 @@ export async function crawlSingleSource(
 
       if (rawCodeSnippets.length === 0) {
         log.info(`No code snippets found on ${request.url}.`);
+        // Still create a job so we can track the page was crawled
       }
 
-      const enrichmentConcurrency = 2; // Configurable concurrency limit
-      const enrichedData: EnrichedItem[] = [];
+      const job: EmbeddingJobPayload = {
+        jobId,
+        libraryId,
+        libraryName: source.name,
+        libraryDescription,
+        sourceUrl: request.url,
+        rawSnippets: rawCodeSnippets.filter(
+          (snippet) => snippet?.trim() !== '',
+        ),
+        contextMarkdown,
+      };
 
-      for (let i = 0; i < rawCodeSnippets.length; i += enrichmentConcurrency) {
-        const batch = rawCodeSnippets.slice(i, i + enrichmentConcurrency);
-        const batchPromises = batch.map((rawSnippet) => {
-          if (rawSnippet?.trim() !== '') {
-            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown).catch(
-              (e) => {
-                log.error(`Failed to enrich snippet: ${e}`);
-                return null;
-              },
-            );
-          }
-          return Promise.resolve(null);
-        });
-
-        const batchResults = await Promise.all(batchPromises);
-        enrichedData.push(
-          ...batchResults.filter((r): r is EnrichedItem => r !== null),
-        );
-      }
-
-      if (enrichedData.length > 0) {
-        await saveEnrichedData(
-          enrichedData,
-          { libraryId, libraryName: source.name, libraryDescription },
-          request.url,
-        );
+      if (job.rawSnippets.length > 0) {
+        await enqueueEmbeddingJobs([job]);
+      } else {
+        log.info(`No snippets to enqueue for ${request.url}.`);
       }
 
       await enqueueLinks({
         selector: linkSelector || 'a',
-        globs: [getScopeGlob(request.url)],
+        globs: [scopeGlob],
         strategy: 'same-hostname',
       });
     },
@@ -187,41 +188,20 @@ export async function startCrawl({ maxDepth }: { maxDepth?: number } = {}) {
 
       if (rawCodeSnippets.length === 0) {
         log.info(`No code snippets found on ${request.url}.`);
+        // Still create a job so we can track the page was crawled
       }
 
-      const enrichmentConcurrency = 2; // Configurable concurrency limit
-      const enrichedData: EnrichedItem[] = [];
+      const job: EmbeddingJobPayload = {
+        libraryId: request.userData.libraryId,
+        libraryName: request.userData.libraryName,
+        libraryDescription: request.userData.libraryDescription,
+        sourceUrl: request.url,
+        rawSnippets: rawCodeSnippets.filter((snippet) => dedent(snippet)),
+        contextMarkdown,
+      };
 
-      for (let i = 0; i < rawCodeSnippets.length; i += enrichmentConcurrency) {
-        const batch = rawCodeSnippets.slice(i, i + enrichmentConcurrency);
-        const batchPromises = batch.map((rawSnippet) => {
-          if (dedent(rawSnippet)) {
-            return getEnrichedDataFromLLM(rawSnippet, contextMarkdown).catch(
-              (e) => {
-                log.error(`Failed to enrich snippet: ${e}`);
-                return null;
-              },
-            );
-          }
-          return Promise.resolve(null);
-        });
-
-        const batchResults = await Promise.all(batchPromises);
-        enrichedData.push(
-          ...batchResults.filter((r): r is EnrichedItem => r !== null),
-        );
-      }
-
-      if (enrichedData.length > 0) {
-        await saveEnrichedData(
-          enrichedData,
-          {
-            libraryId: request.userData.libraryId,
-            libraryName: request.userData.libraryName,
-            libraryDescription: request.userData.libraryDescription,
-          },
-          request.url,
-        );
+      if (job.rawSnippets.length > 0) {
+        await enqueueEmbeddingJobs([job]);
       }
 
       await enqueueLinks({

@@ -16,6 +16,21 @@ export interface AddSourceResponse {
   libraryId?: string;
 }
 
+export interface CrawlJobStatus {
+  summary: {
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+  };
+  jobs: {
+    id: number;
+    sourceUrl: string;
+    status: string;
+  }[];
+}
+
 export async function searchLibraries(libraryName: string): Promise<SearchResult[]> {
   const response = await fetch(`${API_BASE_URL}/search`, {
     method: 'POST',
@@ -70,5 +85,100 @@ export async function addDocumentationSource(source: DocumentationSource): Promi
     throw new Error(errorData.error || 'Failed to add documentation source');
   }
 
+  return response.json();
+}
+
+export async function startCrawl(data: {
+  libraryName: string;
+  libraryDescription: string;
+  startUrl: string;
+}): Promise<{ jobId: string }> {
+  const response = await fetch(`${API_BASE_URL}/crawl/start`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to start crawl');
+  }
+
+  return response.json();
+}
+
+export async function getCrawlJobStatus(jobId: string): Promise<CrawlJobStatus> {
+  const response = await fetch(`${API_BASE_URL}/crawl/status/${jobId}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch job status');
+  }
+  return response.json();
+}
+
+export async function reprocessJob(jobItemId: number): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/crawl/reprocess`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ jobItemId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || 'Failed to reprocess job');
+  }
+
+  return response.json();
+}
+
+export async function deleteJob(jobItemId: number) {
+  const response = await fetch(`${API_BASE_URL}/crawl/job/${jobItemId}`, {
+    method: 'DELETE',
+  });
+  return response.json();
+}
+
+export async function processSingleJob(jobItemId: number) {
+  const response = await fetch(`${API_BASE_URL}/crawl/process/single`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ id: jobItemId }),
+  });
+  return response.json();
+}
+
+export async function processAllJobs() {
+  const response = await fetch(`${API_BASE_URL}/crawl/process/all`, {
+    method: 'POST',
+  });
+  return response.json();
+}
+
+export async function getLatestJobForLibrary(
+  libraryId: string,
+): Promise<{ jobId: string | null }> {
+  const response = await fetch(
+    `${API_BASE_URL}/libraries/${libraryId}/latest-job`,
+  );
+  if (!response.ok) {
+    throw new Error('Failed to fetch latest job for library');
+  }
+  return response.json();
+}
+
+export async function deleteLibrary(
+  libraryId: string,
+): Promise<{ success: boolean; message: string }> {
+  const response = await fetch(`${API_BASE_URL}/libraries/${libraryId}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) {
+    throw new Error('Failed to delete library');
+  }
   return response.json();
 }

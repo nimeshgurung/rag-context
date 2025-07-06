@@ -12,6 +12,7 @@ async function setupDatabase() {
     const dropQuery = `
       DROP TABLE IF EXISTS library_docs CASCADE;
       DROP TABLE IF EXISTS libraries CASCADE;
+      DROP TABLE IF EXISTS embedding_jobs CASCADE;
     `;
     await pool.query(dropQuery);
     console.log('Existing tables dropped.');
@@ -23,6 +24,13 @@ async function setupDatabase() {
     );
     await pool.query(createTableSql);
     console.log('Tables created successfully.');
+
+    const createEmbeddingJobsTableSql = fs.readFileSync(
+      path.join(__dirname, 'create_embedding_jobs_table.sql'),
+      'utf8',
+    );
+    await pool.query(createEmbeddingJobsTableSql);
+    console.log('Embedding jobs table created successfully.');
   } catch (error) {
     console.error('Error setting up the database:', error);
   } finally {

@@ -10,6 +10,7 @@
     "dev": "mastra dev",
     "build": "tsc",
     "start": "mastra start",
+    "backend:dev": "tsx src/express-server.ts",
     "test:watch": "jest --watch",
     "slop": "tsx src/slop/converter.ts",
     "ingest": "tsx scripts/ingestData.ts",
@@ -20,7 +21,8 @@
     "db:setup": "tsx scripts/db-setup.ts",
     "dev:frontend": "npm run dev --prefix frontend",
     "crawl": "tsx scripts/run-crawler.ts",
-    "clear-library": "tsx scripts/clear-library-data.ts"
+    "clear-library": "tsx scripts/clear-library-data.ts",
+    "process-embeddings": "tsx src/lib/embedding/worker.ts"
   },
   "keywords": [],
   "author": "",

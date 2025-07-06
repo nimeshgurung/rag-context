@@ -1,7 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Link, Typography, Box, TextField } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
-import { getLibraries } from '../services/api';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Link,
+  Typography,
+  Box,
+  TextField,
+  Button,
+  CircularProgress,
+} from '@mui/material';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import {
+  getLibraries,
+  getLatestJobForLibrary,
+  deleteLibrary,
+} from '../services/api';
 
 interface Library {
   libraryId: string;
@@ -14,6 +32,9 @@ const HomePage: React.FC = () => {
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [checkingJobId, setCheckingJobId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const fetchLibraries = useCallback(async () => {
     try {
@@ -42,6 +63,42 @@ const HomePage: React.FC = () => {
     };
   }, [fetchLibraries]);
 
+  const handleViewLastJob = async (libraryId: string) => {
+    setCheckingJobId(libraryId);
+    try {
+      const { jobId } = await getLatestJobForLibrary(libraryId);
+      if (jobId) {
+        navigate(`/jobs/${jobId}`);
+      } else {
+        alert('No job found for this library.');
+      }
+    } catch (error) {
+      console.error('Failed to get latest job', error);
+      alert('Could not retrieve job information.');
+    } finally {
+      setCheckingJobId(null);
+    }
+  };
+
+  const handleDeleteLibrary = async (libraryId: string, libraryName: string) => {
+    if (
+      window.confirm(
+        `Are you sure you want to delete the "${libraryName}" library and all its associated data? This action cannot be undone.`,
+      )
+    ) {
+      setDeletingId(libraryId);
+      try {
+        await deleteLibrary(libraryId);
+        fetchLibraries(); // Refresh the list
+      } catch (error) {
+        console.error('Failed to delete library', error);
+        alert('Could not delete the library.');
+      } finally {
+        setDeletingId(null);
+      }
+    }
+  };
+
   const filteredLibraries = libraries.filter(library =>
     library.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     library.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -69,6 +126,7 @@ const HomePage: React.FC = () => {
               <TableCell>Name</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>ID</TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -87,6 +145,34 @@ const HomePage: React.FC = () => {
                 </TableCell>
                 <TableCell>{row.description}</TableCell>
                 <TableCell>{row.libraryId}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => handleViewLastJob(row.libraryId)}
+                    disabled={checkingJobId === row.libraryId}
+                  >
+                    {checkingJobId === row.libraryId ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      'View Last Job'
+                    )}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="error"
+                    onClick={() => handleDeleteLibrary(row.libraryId, row.name)}
+                    disabled={deletingId === row.libraryId}
+                    sx={{ ml: 1 }}
+                  >
+                    {deletingId === row.libraryId ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      'Delete'
+                    )}
+                  </Button>
+                </TableCell>
               </TableRow>
               ))
             )}
