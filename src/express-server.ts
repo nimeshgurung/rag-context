@@ -20,9 +20,8 @@ app.use('/api/docs', documentationRoutes);
 app.use('/api/crawl', crawlRoutes);
 app.use('/api/jobs', eventsRoutes);
 
-// Legacy route mapping for backward compatibility
 app.post('/api/search', (req: Request, res: Response) => {
-  // Redirect to the new libraries/search endpoint
+  // Redirect to the new /search endpoint
   req.url = '/search';
   librariesRoutes(req, res, () => {});
 });
