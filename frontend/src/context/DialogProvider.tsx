@@ -1,7 +1,9 @@
 import React, { createContext, useState, useContext, useCallback } from 'react';
 import type { ReactNode } from 'react';
+import type { AlertColor } from '@mui/material';
 import AlertDialog from '../components/AlertDialog';
 import ConfirmDialog from '../components/ConfirmDialog';
+import SnackbarNotification from '../components/SnackbarNotification';
 
 interface DialogState {
   open: boolean;
@@ -16,10 +18,18 @@ interface ConfirmDialogState {
   onConfirm: () => void;
 }
 
+interface SnackbarState {
+  open: boolean;
+  message: string;
+  severity: AlertColor;
+}
+
 interface DialogContextType {
   showDialog: (title: string, message: string) => void;
   hideDialog: () => void;
   showConfirm: (title: string, message: string, onConfirm: () => void) => void;
+  showSnackbar: (message: string, severity?: AlertColor) => void;
+  hideSnackbar: () => void;
 }
 
 const DialogContext = createContext<DialogContextType | undefined>(undefined);
@@ -48,6 +58,12 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
     onConfirm: () => {},
   });
 
+  const [snackbar, setSnackbar] = useState<SnackbarState>({
+    open: false,
+    message: '',
+    severity: 'info',
+  });
+
   const showDialog = useCallback((title: string, message: string) => {
     setDialog({ open: true, title, message });
   }, []);
@@ -67,13 +83,24 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
     setConfirmDialog((prev) => ({ ...prev, open: false }));
   }, []);
 
+  const showSnackbar = useCallback(
+    (message: string, severity: AlertColor = 'info') => {
+      setSnackbar({ open: true, message, severity });
+    },
+    [],
+  );
+
+  const hideSnackbar = useCallback(() => {
+    setSnackbar((prev) => ({ ...prev, open: false }));
+  }, []);
+
   const handleConfirm = () => {
     confirmDialog.onConfirm();
     hideConfirm();
   };
 
   return (
-    <DialogContext.Provider value={{ showDialog, hideDialog, showConfirm }}>
+    <DialogContext.Provider value={{ showDialog, hideDialog, showConfirm, showSnackbar, hideSnackbar }}>
       {children}
       <AlertDialog
         open={dialog.open}
@@ -87,6 +114,12 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
         message={confirmDialog.message}
         onClose={hideConfirm}
         onConfirm={handleConfirm}
+      />
+      <SnackbarNotification
+        open={snackbar.open}
+        message={snackbar.message}
+        severity={snackbar.severity}
+        onClose={hideSnackbar}
       />
     </DialogContext.Provider>
   );

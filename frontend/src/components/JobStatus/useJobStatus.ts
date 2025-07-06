@@ -7,9 +7,11 @@ import {
   processAllJobs,
 } from '../../services/api';
 import type { Job, JobStatus } from '../../types';
+import { useDialog } from '../../context/DialogProvider';
 
 export const useJobStatus = () => {
   const { jobId } = useParams<{ jobId: string }>();
+  const { showSnackbar, showConfirm } = useDialog();
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,15 +50,20 @@ export const useJobStatus = () => {
   }, [jobId, isLoading, isProcessing, fetchStatus]);
 
   const handleDelete = async (jobItemId: number) => {
-    if (window.confirm('Are you sure you want to delete this job?')) {
-      try {
-        await deleteJob(jobItemId);
-        fetchStatus();
-      } catch (err) {
-        console.error('Failed to delete job:', err);
-        alert('Failed to delete job.');
+    showConfirm(
+      'Delete Job',
+      'Are you sure you want to delete this job?',
+      async () => {
+        try {
+          await deleteJob(jobItemId);
+          fetchStatus();
+          showSnackbar('Job deleted successfully', 'success');
+        } catch (err) {
+          console.error('Failed to delete job:', err);
+          showSnackbar('Failed to delete job', 'error');
+        }
       }
-    }
+    );
   };
 
   const handleProcessSingle = async (jobItemId: number) => {
@@ -64,9 +71,10 @@ export const useJobStatus = () => {
     try {
       await processSingleJob(jobItemId);
       fetchStatus();
+      showSnackbar('Job processed successfully', 'success');
     } catch (err) {
       console.error('Failed to process job:', err);
-      alert('Failed to process job.');
+      showSnackbar('Failed to process job', 'error');
     } finally {
       setProcessingJobId(null);
     }
@@ -79,12 +87,13 @@ export const useJobStatus = () => {
     try {
       await processAllJobs(jobId);
       fetchStatus();
+      showSnackbar('All jobs processing started', 'success');
     } catch (err) {
       console.error(
         'Failed to start processing all jobs for the library:',
         err,
       );
-      alert('An error occurred while starting job processing.');
+      showSnackbar('An error occurred while starting job processing', 'error');
       setIsProcessing(false);
     }
   };
@@ -95,35 +104,35 @@ export const useJobStatus = () => {
       await Promise.all(
         Array.from(selectedJobIds).map((id) => processSingleJob(id)),
       );
-      alert('Selected jobs are being processed.');
+      showSnackbar('Selected jobs are being processed', 'success');
       setSelectedJobIds(new Set());
       fetchStatus();
     } catch (err) {
       console.error('Failed to process selected jobs:', err);
-      alert('An error occurred while processing selected jobs.');
+      showSnackbar('An error occurred while processing selected jobs', 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const handleDeleteSelected = async () => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete ${selectedJobIds.size} jobs?`,
-      )
-    ) {
-      try {
-        await Promise.all(
-          Array.from(selectedJobIds).map((id) => deleteJob(id)),
-        );
-        alert('Selected jobs have been deleted.');
-        setSelectedJobIds(new Set());
-        fetchStatus();
-      } catch (err) {
-        console.error('Failed to delete selected jobs:', err);
-        alert('An error occurred while deleting selected jobs.');
+    showConfirm(
+      'Delete Selected Jobs',
+      `Are you sure you want to delete ${selectedJobIds.size} jobs?`,
+      async () => {
+        try {
+          await Promise.all(
+            Array.from(selectedJobIds).map((id) => deleteJob(id)),
+          );
+          showSnackbar('Selected jobs have been deleted', 'success');
+          setSelectedJobIds(new Set());
+          fetchStatus();
+        } catch (err) {
+          console.error('Failed to delete selected jobs:', err);
+          showSnackbar('An error occurred while deleting selected jobs', 'error');
+        }
       }
-    }
+    );
   };
 
   const handleFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
