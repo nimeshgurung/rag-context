@@ -6,23 +6,25 @@ import { useJobProgress } from './useJobProgress';
 import { useApiSpecForm } from './useApiSpecForm';
 import { useWebScrapeForm } from './useWebScrapeForm';
 import type { ApiSpecSource, WebScrapeSource } from '../../../src/lib/types';
+import  usePrevious from 'use-previous';
 
 export const useAddDocsModal = (open: boolean, onClose: () => void) => {
   const [activeTab, setActiveTab] = useState(0);
   const { showDialog } = useDialog();
-  const jobProgress = useJobProgress();
-  const apiSpecForm = useApiSpecForm();
-  const webScrapeForm = useWebScrapeForm();
+  const { reset: resetJobProgress, setProcessing, addProgress, startListening, isProcessing, progress } = useJobProgress();
+  const { reset: resetApiSpecForm, getContent: getApiSpecContent } = useApiSpecForm();
+  const { reset: resetWebScrapeForm } = useWebScrapeForm();
+  const previousOpen = usePrevious<boolean>(open || false);
 
   // Reset all forms when modal closes
   useEffect(() => {
-    if (!open) {
-      jobProgress.reset();
-      apiSpecForm.reset();
-      webScrapeForm.reset();
+    if (!open && previousOpen) {
+      resetJobProgress();
+      resetApiSpecForm();
+      resetWebScrapeForm();
       setActiveTab(0);
     }
-  }, [open, jobProgress, apiSpecForm, webScrapeForm]);
+  }, [open, previousOpen, resetJobProgress, resetApiSpecForm, resetWebScrapeForm]);
 
   const handleTabChange = useCallback((_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -55,14 +57,14 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
         content,
       };
 
-      jobProgress.setProcessing(true);
-      jobProgress.addProgress('Submitting API specification...');
+      setProcessing(true);
+      addProgress('Submitting API specification...');
 
       const res = await addDocumentationSource(source);
       if (res.jobId) {
-        jobProgress.addProgress('Processing started. Listening for updates...');
-        const eventSource = jobProgress.startListening(res.jobId);
-        
+        addProgress('Processing started. Listening for updates...');
+        const eventSource = startListening(res.jobId);
+
         // Auto-close modal after job completion
         setTimeout(() => {
           eventSource.close();
@@ -71,10 +73,10 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
       }
     } catch (error) {
       console.error('Failed to add API Spec source', error);
-      jobProgress.addProgress('Error submitting job.');
+      addProgress('Error submitting job.');
       setTimeout(() => onClose(), 3000);
     }
-  }, [jobProgress, showDialog, onClose]);
+  }, [setProcessing, addProgress, startListening, showDialog, onClose]);
 
   const handleWebScrapeSubmit = useCallback(async (formData: ReturnType<typeof useWebScrapeForm>) => {
     if (!formData.validate()) {
@@ -99,14 +101,14 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
     };
 
     try {
-      jobProgress.setProcessing(true);
-      jobProgress.addProgress('Submitting web scrape job...');
+      setProcessing(true);
+      addProgress('Submitting web scrape job...');
 
       const res = await addDocumentationSource(source);
       if (res.jobId) {
-        jobProgress.addProgress('Processing started. Listening for updates...');
-        const eventSource = jobProgress.startListening(res.jobId);
-        
+        addProgress('Processing started. Listening for updates...');
+        const eventSource = startListening(res.jobId);
+
         // Auto-close modal after job completion
         setTimeout(() => {
           eventSource.close();
@@ -115,22 +117,22 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
       }
     } catch (error) {
       console.error('Failed to add Web Scrape source', error);
-      jobProgress.addProgress('Error submitting job.');
+      addProgress('Error submitting job.');
       if (error instanceof Error) {
         showDialog('Error', `Error: ${error.message}`);
       } else {
         showDialog('Error', 'An unknown error occurred.');
       }
     }
-  }, [jobProgress, showDialog, onClose]);
+  }, [setProcessing, addProgress, startListening, showDialog, onClose]);
 
   return {
     activeTab,
     handleTabChange,
     handleApiSpecSubmit,
     handleWebScrapeSubmit,
-    jobProgress,
-    apiSpecForm,
-    webScrapeForm,
-  };
+    getApiSpecContent,
+    isProcessing,
+    progress,
+  }
 };
