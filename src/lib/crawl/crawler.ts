@@ -34,7 +34,7 @@ export async function crawlSingleSource(
   libraryDescription: string,
 ) {
   const { startUrl, config } = source;
-  const { contentSelector, linkSelector, maxDepth = 5 } = config;
+  const { contentSelector, codeSelector, preExecutionSteps, maxDepth = 5 } = config;
 
   const scopeGlob = getScopeGlob(startUrl);
 
@@ -48,6 +48,30 @@ export async function crawlSingleSource(
         message: `Crawling: ${request.url}`,
       });
 
+      // Execute pre-execution steps if provided
+      if (preExecutionSteps && preExecutionSteps.trim()) {
+        try {
+          log.info(`[Job ${jobId}] Executing pre-execution steps for: ${request.url}`);
+          sendEvent(jobId, {
+            type: 'progress',
+            message: `Executing pre-steps for: ${request.url}`,
+          });
+          
+          // Execute the pre-execution steps as JavaScript code
+          await page.evaluate(preExecutionSteps);
+          
+          // Wait a bit for any dynamic content to load
+          await page.waitForTimeout(1000);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          log.warning(`[Job ${jobId}] Pre-execution steps failed for ${request.url}: ${errorMessage}`);
+          sendEvent(jobId, {
+            type: 'progress',
+            message: `Pre-execution steps failed for: ${request.url}`,
+          });
+        }
+      }
+
       const mainContentHTML = await page.evaluate((selector) => {
         const el = document.querySelector(selector);
         return el ? el.innerHTML : document.body.innerHTML;
@@ -60,13 +84,15 @@ export async function crawlSingleSource(
 
       const contextMarkdown = turndownService.turndown(mainContentHTML);
 
-      const rawCodeSnippets = await page.evaluate(() => {
+      // Use codeSelector if provided, otherwise default to 'pre > code'
+      const codeSnippetSelector = codeSelector || 'pre > code';
+      const rawCodeSnippets = await page.evaluate((selector) => {
         const snippets: string[] = [];
-        document.querySelectorAll('pre > code').forEach((codeElement) => {
+        document.querySelectorAll(selector).forEach((codeElement) => {
           snippets.push((codeElement as HTMLElement).textContent || '');
         });
         return snippets;
-      });
+      }, codeSnippetSelector);
 
       if (rawCodeSnippets.length === 0) {
         log.info(`No code snippets found on ${request.url}.`);
@@ -91,8 +117,9 @@ export async function crawlSingleSource(
         log.info(`No snippets to enqueue for ${request.url}.`);
       }
 
+      // Use default link selector since we removed linkSelector
       await enqueueLinks({
-        selector: linkSelector || 'a',
+        selector: 'a',
         globs: [scopeGlob],
         strategy: 'same-hostname',
       });
