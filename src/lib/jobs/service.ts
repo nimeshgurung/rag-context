@@ -90,17 +90,40 @@ export async function getCrawlJobStatus(jobId: string) {
   };
 }
 
-export async function reprocessJob(jobItemId: number) {
-  await pool.query(
-    `UPDATE embedding_jobs SET status = 'pending', processed_at = null, error_message = null WHERE id = $1`,
-    [jobItemId],
-  );
-  return { success: true };
-}
-
 export async function deleteJob(jobItemId: number) {
-  await pool.query('DELETE FROM embedding_jobs WHERE id = $1', [jobItemId]);
-  return { success: true };
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get the source_url from the job to be deleted
+    const jobResult = await client.query(
+      'SELECT source_url, library_id FROM embedding_jobs WHERE id = $1',
+      [jobItemId],
+    );
+
+    if (jobResult.rows.length === 0) {
+      throw new Error(`Job item with ID ${jobItemId} not found.`);
+    }
+    const { source_url: sourceUrl, library_id: libraryId } = jobResult.rows[0];
+
+    // Delete associated embeddings from slop_embeddings
+    await client.query(
+      "DELETE FROM slop_embeddings WHERE library_id = $1 AND metadata->>'source' = $2",
+      [libraryId, sourceUrl],
+    );
+
+    // Delete the job from embedding_jobs
+    await client.query('DELETE FROM embedding_jobs WHERE id = $1', [jobItemId]);
+
+    await client.query('COMMIT');
+    return { success: true };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(`Failed to delete job item ${jobItemId}:`, error);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function processSingleJob(jobItemId: number) {

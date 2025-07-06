@@ -19,10 +19,8 @@ interface JobsTableProps {
   selectedJobIds: Set<number>;
   onSelectAllClick: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onSelectClick: (id: number) => void;
-  onReprocess: (id: number) => void;
   onProcessSingle: (id: number) => void;
   onDelete: (id: number) => void;
-  isReprocessing: number | null;
   processingJobId: number | null;
   isActionPending: boolean;
 }
@@ -32,10 +30,8 @@ const JobsTable: React.FC<JobsTableProps> = ({
   selectedJobIds,
   onSelectAllClick,
   onSelectClick,
-  onReprocess,
   onProcessSingle,
   onDelete,
-  isReprocessing,
   processingJobId,
   isActionPending,
 }) => {
@@ -65,12 +61,12 @@ const JobsTable: React.FC<JobsTableProps> = ({
         <TableBody>
           {jobs.map((job) => (
             <TableRow
-              key={job.id}
               hover
               onClick={() => onSelectClick(job.id)}
               role="checkbox"
               aria-checked={selectedJobIds.has(job.id)}
               tabIndex={-1}
+              key={job.id}
               selected={selectedJobIds.has(job.id)}
               sx={{ cursor: 'pointer' }}
             >
@@ -80,29 +76,12 @@ const JobsTable: React.FC<JobsTableProps> = ({
                   checked={selectedJobIds.has(job.id)}
                 />
               </TableCell>
-              <TableCell>{job.sourceUrl}</TableCell>
+              <TableCell sx={{ maxWidth: 400, wordBreak: 'break-all' }}>
+                {job.sourceUrl}
+              </TableCell>
               <TableCell>{job.status}</TableCell>
               <TableCell>
                 <Box sx={{ display: 'flex', gap: 1 }}>
-                  {job.status === 'failed' && (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onReprocess(job.id);
-                      }}
-                      disabled={
-                        isReprocessing === job.id ? false : isActionPending
-                      }
-                    >
-                      {isReprocessing === job.id ? (
-                        <CircularProgress size={20} />
-                      ) : (
-                        'Reprocess'
-                      )}
-                    </Button>
-                  )}
                   <Button
                     variant="outlined"
                     size="small"

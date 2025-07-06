@@ -18,7 +18,6 @@ const JobStatusPage = () => {
     status,
     isLoading,
     error,
-    isReprocessing,
     processingJobId,
     isProcessing,
     filterText,
@@ -26,7 +25,6 @@ const JobStatusPage = () => {
     filteredJobs,
     progress,
     isActionPending,
-    handleReprocess,
     handleDelete,
     handleProcessSingle,
     handleProcessAll,
@@ -115,10 +113,8 @@ const JobStatusPage = () => {
             selectedJobIds={selectedJobIds}
             onSelectAllClick={handleSelectAllClick}
             onSelectClick={handleSelectClick}
-            onReprocess={handleReprocess}
             onProcessSingle={handleProcessSingle}
             onDelete={handleDelete}
-            isReprocessing={isReprocessing}
             processingJobId={processingJobId}
             isActionPending={isActionPending}
           />

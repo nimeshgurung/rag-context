@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   getCrawlJobStatus,
-  reprocessJob,
   deleteJob,
   processSingleJob,
   processAllJobs,
@@ -14,7 +13,6 @@ export const useJobStatus = () => {
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isReprocessing, setIsReprocessing] = useState<number | null>(null);
   const [processingJobId, setProcessingJobId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [filterText, setFilterText] = useState<string>('');
@@ -48,18 +46,6 @@ export const useJobStatus = () => {
 
     return () => clearInterval(pollInterval);
   }, [jobId, isLoading, isProcessing, fetchStatus]);
-
-  const handleReprocess = async (jobItemId: number) => {
-    setIsReprocessing(jobItemId);
-    try {
-      await reprocessJob(jobItemId);
-      fetchStatus();
-    } catch (err) {
-      console.error('Failed to reprocess job', err);
-    } finally {
-      setIsReprocessing(null);
-    }
-  };
 
   const handleDelete = async (jobItemId: number) => {
     if (window.confirm('Are you sure you want to delete this job?')) {
@@ -173,15 +159,13 @@ export const useJobStatus = () => {
       ? (status.summary.completed / status.summary.total) * 100
       : 0;
 
-  const isActionPending =
-    isProcessing || isReprocessing !== null || processingJobId !== null;
+  const isActionPending = isProcessing || processingJobId !== null;
 
   return {
     jobId,
     status,
     isLoading,
     error,
-    isReprocessing,
     processingJobId,
     isProcessing,
     filterText,
@@ -189,7 +173,6 @@ export const useJobStatus = () => {
     filteredJobs,
     progress,
     isActionPending,
-    handleReprocess,
     handleDelete,
     handleProcessSingle,
     handleProcessAll,

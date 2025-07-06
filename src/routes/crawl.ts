@@ -1,12 +1,11 @@
 import express, { Request, Response } from 'express';
 import {
   getCrawlJobStatus,
-  reprocessJob,
   deleteJob,
   processSingleJob,
   startCrawlJob,
   processAllJobs,
-} from '../lib/api';
+} from '../lib/jobs/service';
 
 const router = express.Router();
 
@@ -53,28 +52,6 @@ router.get(
   },
 );
 
-// Reprocess a job
-router.post(
-  '/reprocess',
-  async (
-    req: Request<object, object, { id: number }>,
-    res: Response,
-  ): Promise<void> => {
-    const jobItemId = req.body.id;
-    try {
-      const result = await reprocessJob(jobItemId);
-      res.json(result);
-    } catch (error) {
-      console.error(`Failed to reprocess job item ${jobItemId}:`, error);
-      res.status(500).json({
-        success: false,
-        message:
-          error instanceof Error ? error.message : 'An unknown error occurred.',
-      });
-    }
-  },
-);
-
 // Delete a job
 router.delete(
   '/job/:id',
@@ -94,17 +71,17 @@ router.delete(
   },
 );
 
-// Process a single job
+// Process a single job item
 router.post(
-  '/process/single',
+  '/process/single/:id',
   async (
-    req: Request<object, object, { id: number }>,
+    req: Request<{ id: string }, object, { id: number }>,
     res: Response,
   ): Promise<void> => {
-    const { id } = req.body;
+    const { id } = req.params;
     console.warn('Processing job item', id);
     try {
-      const result = await processSingleJob(id);
+      const result = await processSingleJob(parseInt(id, 10));
       res.json(result);
     } catch (error) {
       console.error(`Failed to process job item ${id}:`, error);

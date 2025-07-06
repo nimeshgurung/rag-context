@@ -117,23 +117,6 @@ export async function getCrawlJobStatus(jobId: string): Promise<CrawlJobStatus> 
   return response.json();
 }
 
-export async function reprocessJob(jobItemId: number): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE_URL}/crawl/reprocess`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ jobItemId }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to reprocess job');
-  }
-
-  return response.json();
-}
-
 export async function deleteJob(jobItemId: number) {
   const response = await fetch(`${API_BASE_URL}/crawl/job/${jobItemId}`, {
     method: 'DELETE',
