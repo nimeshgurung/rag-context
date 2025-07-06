@@ -43,13 +43,9 @@ const JobsTable: React.FC<JobsTableProps> = ({
             <TableCell padding="checkbox">
               <Checkbox
                 indeterminate={
-                  selectedJobIds.size > 0 &&
-                  selectedJobIds.size < jobs.length
+                  selectedJobIds.size > 0 && selectedJobIds.size < jobs.length
                 }
-                checked={
-                  jobs.length > 0 &&
-                  selectedJobIds.size === jobs.length
-                }
+                checked={jobs.length > 0 && selectedJobIds.size === jobs.length}
                 onChange={onSelectAllClick}
               />
             </TableCell>

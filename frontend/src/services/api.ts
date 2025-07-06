@@ -1,4 +1,4 @@
-import type { DocumentationSource } from "../../../src/lib/types";
+import type { DocumentationSource } from '../../../src/lib/types';
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -31,7 +31,9 @@ export interface CrawlJobStatus {
   }[];
 }
 
-export async function searchLibraries(libraryName: string): Promise<SearchResult[]> {
+export async function searchLibraries(
+  libraryName: string,
+): Promise<SearchResult[]> {
   const response = await fetch(`${API_BASE_URL}/search`, {
     method: 'POST',
     headers: {
@@ -54,8 +56,11 @@ export async function getLibraries(): Promise<SearchResult[]> {
   return response.json();
 }
 
-export async function fetchLibraryDocumentation(libraryId: string, topic?: string): Promise<string> {
-    const response = await fetch(`${API_BASE_URL}/docs`, {
+export async function fetchLibraryDocumentation(
+  libraryId: string,
+  topic?: string,
+): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/docs`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -71,7 +76,9 @@ export async function fetchLibraryDocumentation(libraryId: string, topic?: strin
   return result.documentation || '';
 }
 
-export async function addDocumentationSource(source: DocumentationSource): Promise<AddSourceResponse> {
+export async function addDocumentationSource(
+  source: DocumentationSource,
+): Promise<AddSourceResponse> {
   const response = await fetch(`${API_BASE_URL}/libraries/add-source`, {
     method: 'POST',
     headers: {
@@ -109,7 +116,9 @@ export async function startCrawl(data: {
   return response.json();
 }
 
-export async function getCrawlJobStatus(jobId: string): Promise<CrawlJobStatus> {
+export async function getCrawlJobStatus(
+  jobId: string,
+): Promise<CrawlJobStatus> {
   const response = await fetch(`${API_BASE_URL}/crawl/status/${jobId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch job status');

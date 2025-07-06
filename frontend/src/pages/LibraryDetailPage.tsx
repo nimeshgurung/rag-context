@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Box, Typography, TextField, Button, Paper, CircularProgress } from '@mui/material';
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  CircularProgress,
+} from '@mui/material';
 import { fetchLibraryDocumentation } from '../services/api';
 
 const LibraryDetailPage: React.FC = () => {
@@ -48,9 +55,14 @@ const LibraryDetailPage: React.FC = () => {
           placeholder="Show docs for... e.g. data fetching, routing, middleware"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          size='small'
+          size="small"
         />
-        <Button variant="contained" onClick={handleSearch} size='small' sx={{ minWidth: '160px' }}>
+        <Button
+          variant="contained"
+          onClick={handleSearch}
+          size="small"
+          sx={{ minWidth: '160px' }}
+        >
           Show Results
         </Button>
       </Box>
@@ -67,7 +79,7 @@ const LibraryDetailPage: React.FC = () => {
               readOnly: true,
               style: {
                 fontFamily: 'monospace',
-              }
+              },
             }}
             rows={30}
           />

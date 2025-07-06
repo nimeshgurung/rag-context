@@ -56,38 +56,44 @@ router.post('/add-source', async (req: Request, res: Response) => {
 });
 
 // Get latest job for a library
-router.get('/:libraryId/latest-job', async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
-  const { libraryId } = req.params;
-  try {
-    const result = await getLatestJobForLibrary(libraryId);
-    res.json(result);
-  } catch (error) {
-    console.error(
-      `Failed to get latest job for library ${libraryId}:`,
-      error,
-    );
-    res.status(500).json({
-      success: false,
-      message:
-        error instanceof Error ? error.message : 'An unknown error occurred.',
-    });
-  }
-});
+router.get(
+  '/:libraryId/latest-job',
+  async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
+    const { libraryId } = req.params;
+    try {
+      const result = await getLatestJobForLibrary(libraryId);
+      res.json(result);
+    } catch (error) {
+      console.error(
+        `Failed to get latest job for library ${libraryId}:`,
+        error,
+      );
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    }
+  },
+);
 
 // Delete a library
-router.delete('/:libraryId', async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
-  const { libraryId } = req.params;
-  try {
-    const result = await deleteLibrary(libraryId);
-    res.json(result);
-  } catch (error) {
-    console.error(`Failed to delete library ${libraryId}:`, error);
-    res.status(500).json({
-      success: false,
-      message:
-        error instanceof Error ? error.message : 'An unknown error occurred.',
-    });
-  }
-});
+router.delete(
+  '/:libraryId',
+  async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
+    const { libraryId } = req.params;
+    try {
+      const result = await deleteLibrary(libraryId);
+      res.json(result);
+    } catch (error) {
+      console.error(`Failed to delete library ${libraryId}:`, error);
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    }
+  },
+);
 
 export default router;
