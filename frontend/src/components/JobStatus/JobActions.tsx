@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Button, TextField } from '@mui/material';
+import { Box, Button, TextField, CircularProgress } from '@mui/material';
 
 interface JobActionsProps {
   filterText: string;
@@ -54,8 +54,9 @@ const JobActions: React.FC<JobActionsProps> = ({
           variant="contained"
           onClick={onProcessAll}
           disabled={isActionPending}
+          startIcon={isProcessing ? <CircularProgress size={16} /> : null}
         >
-          {isProcessing ? 'Processing...' : 'Process All'}
+          {isProcessing ? 'Processing All Jobs...' : 'Process All'}
         </Button>
       </Box>
     </Box>

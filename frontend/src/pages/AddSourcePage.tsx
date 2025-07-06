@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -31,8 +31,12 @@ const AddSourcePage = () => {
         startUrl,
       });
       navigate(`/jobs/${result.jobId}`);
-    } catch (err: any) {
-      setError(err.message || 'Failed to start crawl job.');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || 'Failed to start crawl job.');
+      } else {
+        setError('An unknown error occurred.');
+      }
     } finally {
       setIsLoading(false);
     }

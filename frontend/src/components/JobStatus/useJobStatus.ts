@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   getCrawlJobStatus,
-  reprocessJob,
   deleteJob,
   processSingleJob,
   processAllJobs,
@@ -14,7 +13,6 @@ export const useJobStatus = () => {
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isReprocessing, setIsReprocessing] = useState<number | null>(null);
   const [processingJobId, setProcessingJobId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [filterText, setFilterText] = useState<string>('');
@@ -25,39 +23,29 @@ export const useJobStatus = () => {
     try {
       const result = await getCrawlJobStatus(jobId);
       setStatus(result);
+      if (result.summary.pending === 0 && result.summary.processing === 0) {
+        setIsProcessing(false);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message || 'Failed to fetch job status.');
-      return true; // Stop polling on error
     }
-    return false;
   }, [jobId]);
 
   useEffect(() => {
+    if (!jobId) return;
     setIsLoading(true);
     fetchStatus().finally(() => setIsLoading(false));
+  }, [jobId, fetchStatus]);
 
-    const intervalId = setInterval(async () => {
-      const shouldStop = await fetchStatus();
-      if (shouldStop) {
-        clearInterval(intervalId);
-      }
-    }, 5000);
+  useEffect(() => {
+    if (!jobId || isLoading) return;
 
-    return () => clearInterval(intervalId);
-  }, [fetchStatus]);
+    const interval = isProcessing ? 2000 : 5000;
+    const pollInterval = setInterval(fetchStatus, interval);
 
-  const handleReprocess = async (jobItemId: number) => {
-    setIsReprocessing(jobItemId);
-    try {
-      await reprocessJob(jobItemId);
-      fetchStatus();
-    } catch (err) {
-      console.error('Failed to reprocess job', err);
-    } finally {
-      setIsReprocessing(null);
-    }
-  };
+    return () => clearInterval(pollInterval);
+  }, [jobId, isLoading, isProcessing, fetchStatus]);
 
   const handleDelete = async (jobItemId: number) => {
     if (window.confirm('Are you sure you want to delete this job?')) {
@@ -85,14 +73,18 @@ export const useJobStatus = () => {
   };
 
   const handleProcessAll = async () => {
+    if (!jobId) return;
+
     setIsProcessing(true);
     try {
-      const result = await processAllJobs();
-      alert(result.message);
+      await processAllJobs(jobId);
+      fetchStatus();
     } catch (err) {
-      console.error('Failed to start processing all jobs:', err);
-      alert('Failed to start processing all jobs.');
-    } finally {
+      console.error(
+        'Failed to start processing all jobs for the library:',
+        err,
+      );
+      alert('An error occurred while starting job processing.');
       setIsProcessing(false);
     }
   };
@@ -167,15 +159,13 @@ export const useJobStatus = () => {
       ? (status.summary.completed / status.summary.total) * 100
       : 0;
 
-  const isActionPending =
-    isProcessing || isReprocessing !== null || processingJobId !== null;
+  const isActionPending = isProcessing || processingJobId !== null;
 
   return {
     jobId,
     status,
     isLoading,
     error,
-    isReprocessing,
     processingJobId,
     isProcessing,
     filterText,
@@ -183,7 +173,6 @@ export const useJobStatus = () => {
     filteredJobs,
     progress,
     isActionPending,
-    handleReprocess,
     handleDelete,
     handleProcessSingle,
     handleProcessAll,

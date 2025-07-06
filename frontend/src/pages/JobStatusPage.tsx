@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Container,
   Typography,
@@ -6,6 +5,7 @@ import {
   CircularProgress,
   Alert,
   LinearProgress,
+  Chip,
 } from '@mui/material';
 import { useJobStatus } from '../components/JobStatus/useJobStatus';
 import JobSummary from '../components/JobStatus/JobSummary';
@@ -18,7 +18,6 @@ const JobStatusPage = () => {
     status,
     isLoading,
     error,
-    isReprocessing,
     processingJobId,
     isProcessing,
     filterText,
@@ -26,7 +25,6 @@ const JobStatusPage = () => {
     filteredJobs,
     progress,
     isActionPending,
-    handleReprocess,
     handleDelete,
     handleProcessSingle,
     handleProcessAll,
@@ -62,7 +60,18 @@ const JobStatusPage = () => {
             <JobSummary summary={status.summary} />
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <Box sx={{ width: '100%', mr: 1 }}>
-                <LinearProgress variant="determinate" value={progress} />
+                <LinearProgress
+                  variant="determinate"
+                  value={progress}
+                  sx={{
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: '#e0e0e0',
+                    '& .MuiLinearProgress-bar': {
+                      backgroundColor: isProcessing ? '#2196f3' : '#4caf50',
+                    },
+                  }}
+                />
               </Box>
               <Box sx={{ minWidth: 35 }}>
                 <Typography variant="body2" color="text.secondary">
@@ -70,8 +79,27 @@ const JobStatusPage = () => {
                 </Typography>
               </Box>
             </Box>
+            {isProcessing && (
+              <Box
+                sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}
+              >
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="primary">
+                  Processing jobs in the background...
+                </Typography>
+                <Chip
+                  label={`${status.summary.processing} processing`}
+                  color="info"
+                  size="small"
+                />
+                <Chip
+                  label={`${status.summary.pending} pending`}
+                  color="warning"
+                  size="small"
+                />
+              </Box>
+            )}
           </Box>
-
           <JobActions
             filterText={filterText}
             onFilterChange={handleFilterChange}
@@ -82,16 +110,13 @@ const JobStatusPage = () => {
             isActionPending={isActionPending}
             isProcessing={isProcessing}
           />
-
           <JobsTable
             jobs={filteredJobs}
             selectedJobIds={selectedJobIds}
             onSelectAllClick={handleSelectAllClick}
             onSelectClick={handleSelectClick}
-            onReprocess={handleReprocess}
             onProcessSingle={handleProcessSingle}
             onDelete={handleDelete}
-            isReprocessing={isReprocessing}
             processingJobId={processingJobId}
             isActionPending={isActionPending}
           />

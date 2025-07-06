@@ -12,7 +12,8 @@ CREATE TABLE embedding_jobs (
     attempts INTEGER DEFAULT 0,
     error_message TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    processed_at TIMESTAMPTZ
 );
 
 -- Index for faster querying of pending jobs

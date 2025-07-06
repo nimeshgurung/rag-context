@@ -10,14 +10,28 @@ const Layout: React.FC = () => {
   const handleCloseModal = () => setModalOpen(false);
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100vw' }}>
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        width: '100vw',
+      }}
+    >
       <AppBar position="static" color="default" elevation={1}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>UBSContext</Link>
+            <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+              UBSContext
+            </Link>
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Button variant="contained" color="primary" size="small" onClick={handleOpenModal}>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              onClick={handleOpenModal}
+            >
               + Add Docs
             </Button>
           </Box>

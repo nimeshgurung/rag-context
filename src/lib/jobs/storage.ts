@@ -50,13 +50,28 @@ export async function enqueueEmbeddingJobs(jobs: EmbeddingJobPayload[]) {
 
 export async function fetchPendingJobs(
   limit: number,
+  jobId?: string,
 ): Promise<(EmbeddingJobPayload & { id: number })[]> {
   const client = await pool.connect();
   try {
-    const res = await client.query(
-      `SELECT * FROM embedding_jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT $1 FOR UPDATE SKIP LOCKED`,
-      [limit],
-    );
+    await client.query('BEGIN');
+
+    const params: (string | number)[] = [];
+    let query = `
+      SELECT *
+      FROM embedding_jobs
+      WHERE status = 'pending'
+    `;
+
+    if (jobId) {
+      params.push(jobId);
+      query += ` AND job_id = $${params.length}`;
+    }
+
+    params.push(limit);
+    query += ` ORDER BY created_at ASC LIMIT $${params.length} FOR UPDATE SKIP LOCKED`;
+
+    const res = await client.query(query, params);
     const jobs = res.rows.map((row) => ({
       id: row.id,
       jobId: row.job_id,
@@ -67,6 +82,7 @@ export async function fetchPendingJobs(
       rawSnippets: row.raw_snippets,
       contextMarkdown: row.context_markdown,
     }));
+
     if (jobs.length > 0) {
       const jobIds = jobs.map((j) => j.id);
       await client.query(
@@ -74,7 +90,13 @@ export async function fetchPendingJobs(
         [jobIds],
       );
     }
+
+    await client.query('COMMIT');
     return jobs;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error fetching pending jobs:', error);
+    throw error;
   } finally {
     client.release();
   }

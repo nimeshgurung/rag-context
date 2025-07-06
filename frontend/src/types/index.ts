@@ -6,6 +6,7 @@ export interface Job {
 
 export interface JobSummary {
   total: number;
+  pending: number;
   processing: number;
   completed: number;
   failed: number;

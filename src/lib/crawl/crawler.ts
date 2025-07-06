@@ -34,7 +34,7 @@ export async function crawlSingleSource(
   libraryDescription: string,
 ) {
   const { startUrl, config } = source;
-  const { contentSelector, linkSelector, maxDepth } = config;
+  const { contentSelector, linkSelector, maxDepth = 5 } = config;
 
   const scopeGlob = getScopeGlob(startUrl);
 
