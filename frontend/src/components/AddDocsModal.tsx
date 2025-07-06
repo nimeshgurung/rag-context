@@ -76,7 +76,8 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
   const [scrapeDescription, setScrapeDescription] = useState('');
   const [startUrl, setStartUrl] = useState('');
   const [contentSelector, setContentSelector] = useState('');
-  const [linkSelector, setLinkSelector] = useState('');
+  const [codeSelector, setCodeSelector] = useState('');
+  const [preExecutionSteps, setPreExecutionSteps] = useState('');
   const [maxDepth, setMaxDepth] = useState<number | ''>('');
 
   useEffect(() => {
@@ -92,7 +93,8 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
       setScrapeDescription('');
       setStartUrl('');
       setContentSelector('');
-      setLinkSelector('');
+      setCodeSelector('');
+      setPreExecutionSteps('');
       setMaxDepth('');
     }
   }, [open]);
@@ -204,7 +206,8 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
       startUrl,
       config: {
         contentSelector: contentSelector || undefined,
-        linkSelector: linkSelector || undefined,
+        codeSelector: codeSelector || undefined,
+        preExecutionSteps: preExecutionSteps || undefined,
         maxDepth: maxDepth === '' ? undefined : Number(maxDepth),
       },
     };
@@ -400,10 +403,19 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
                   size="small"
                 />
                 <TextField
-                  label="Navigation Link Selector"
-                  value={linkSelector}
-                  onChange={(e) => setLinkSelector(e.target.value)}
-                  helperText="e.g., .sidebar a"
+                  label="Code CSS Selector"
+                  value={codeSelector}
+                  onChange={(e) => setCodeSelector(e.target.value)}
+                  helperText="e.g., .code-block, pre code (default: pre > code)"
+                  size="small"
+                />
+                <TextField
+                  label="Pre-Execution Steps"
+                  value={preExecutionSteps}
+                  onChange={(e) => setPreExecutionSteps(e.target.value)}
+                  helperText="JavaScript code to execute before scraping (e.g., click buttons to reveal content)"
+                  multiline
+                  rows={3}
                   size="small"
                 />
                 <TextField

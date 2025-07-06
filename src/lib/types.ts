@@ -50,8 +50,9 @@ export type WebScrapeSource = {
   startUrl: string;
   config: {
     contentSelector?: string;
-    linkSelector?: string;
+    codeSelector?: string;
     maxDepth?: number;
+    preExecutionSteps?: string;
   };
 };
 
