@@ -16,7 +16,6 @@ const Layout: React.FC = () => {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>UBSContext</Link>
           </Typography>
-
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Button variant="contained" color="primary" size="small" onClick={handleOpenModal}>
               + Add Docs
