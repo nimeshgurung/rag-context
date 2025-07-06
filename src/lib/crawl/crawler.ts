@@ -39,13 +39,14 @@ export async function crawlSingleSource(
   const scopeGlob = getScopeGlob(startUrl);
 
   const crawler = new PlaywrightCrawler({
-    maxRequestsPerCrawl: maxDepth,
+    maxRequestsPerCrawl: 1000, // Set a reasonable upper limit for total requests
     maxConcurrency: 1,
     async requestHandler({ request, page, enqueueLinks, log }) {
-      log.info(`[Job ${jobId}] Processing: ${request.url}`);
+      const currentDepth = (request.userData?.depth as number) || 0;
+      log.info(`[Job ${jobId}] Processing: ${request.url} (depth: ${currentDepth})`);
       sendEvent(jobId, {
         type: 'progress',
-        message: `Crawling: ${request.url}`,
+        message: `Crawling: ${request.url} (depth: ${currentDepth})`,
       });
 
       // Execute pre-execution steps if provided
@@ -115,14 +116,19 @@ export async function crawlSingleSource(
         await enqueueEmbeddingJobs([job]);
       } else {
         log.info(`No snippets to enqueue for ${request.url}.`);
+              }
+      
+      // Only enqueue links if we haven't reached max depth
+      if (currentDepth < maxDepth) {
+        await enqueueLinks({
+          selector: 'a',
+          globs: [scopeGlob],
+          strategy: 'same-hostname',
+          userData: { depth: currentDepth + 1 }, // Increment depth for child links
+        });
+      } else {
+        log.info(`[Job ${jobId}] Max depth ${maxDepth} reached for ${request.url}, not enqueuing more links`);
       }
-
-      // Use default link selector since we removed linkSelector
-      await enqueueLinks({
-        selector: 'a',
-        globs: [scopeGlob],
-        strategy: 'same-hostname',
-      });
     },
     failedRequestHandler({ request, log }) {
       log.error(
@@ -136,8 +142,8 @@ export async function crawlSingleSource(
   });
 
   console.log(
-    `[Job ${jobId}] Starting crawl for ${libraryId} at ${startUrl}...`,
+    `[Job ${jobId}] Starting crawl for ${libraryId} at ${startUrl} with max depth ${maxDepth}...`,
   );
-  await crawler.run([startUrl]);
+  await crawler.run([{ url: startUrl, userData: { depth: 0 } }]);
   console.log(`[Job ${jobId}] Crawl for ${libraryId} finished successfully.`);
 }
