@@ -49,6 +49,7 @@ export type WebScrapeSource = {
   description: string;
   startUrl: string;
   config: {
+    scrapeType: 'code' | 'documentation';
     contentSelector?: string;
     codeSelector?: string;
     maxDepth?: number;

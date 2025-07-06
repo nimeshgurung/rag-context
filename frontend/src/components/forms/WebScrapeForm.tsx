@@ -4,6 +4,11 @@ import {
   TextField,
   Button,
   Typography,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormControl,
+  FormLabel,
 } from '@mui/material';
 import { useWebScrapeForm } from '../../hooks/useWebScrapeForm';
 
@@ -22,6 +27,7 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ onSubmit, onCancel }) => 
     codeSelector,
     preExecutionSteps,
     maxDepth,
+    scrapeType,
     setLibraryName,
     setDescription,
     setStartUrl,
@@ -29,6 +35,7 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ onSubmit, onCancel }) => 
     setCodeSelector,
     setPreExecutionSteps,
     setMaxDepth,
+    setScrapeType,
   } = formData;
 
   const handleSubmit = () => {
@@ -65,6 +72,25 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ onSubmit, onCancel }) => 
         onChange={(e) => setStartUrl(e.target.value)}
         size="small"
       />
+      <FormControl component="fieldset" sx={{ m: 1, width: '95%' }}>
+        <FormLabel component="legend">Scrape Type</FormLabel>
+        <RadioGroup
+          row
+          aria-label="scrape type"
+          name="scrape-type"
+          value={scrapeType}
+          onChange={(e) =>
+            setScrapeType(e.target.value as 'code' | 'documentation')
+          }
+        >
+          <FormControlLabel value="code" control={<Radio />} label="Code-focused" />
+          <FormControlLabel
+            value="documentation"
+            control={<Radio />}
+            label="Documentation"
+          />
+        </RadioGroup>
+      </FormControl>
       <Typography variant="subtitle2" sx={{ m: 1, mt: 2 }}>
         Advanced (Optional)
       </Typography>

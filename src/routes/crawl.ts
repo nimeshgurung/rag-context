@@ -13,6 +13,7 @@ interface StartCrawlRequestBody {
   startUrl: string;
   libraryName: string;
   libraryDescription?: string;
+  scrapeType: 'code' | 'documentation';
 }
 
 // Start a crawl job
@@ -23,6 +24,7 @@ router.post(
       req.body.libraryName,
       req.body.libraryDescription || '',
       req.body.startUrl,
+      req.body.scrapeType,
     )
       .then((jobId) => {
         res.status(202).json({ jobId });

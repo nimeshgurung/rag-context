@@ -8,6 +8,7 @@ export interface WebScrapeFormState {
   codeSelector: string;
   preExecutionSteps: string;
   maxDepth: number | '';
+  scrapeType: 'code' | 'documentation';
 }
 
 export interface WebScrapeFormActions {
@@ -18,6 +19,7 @@ export interface WebScrapeFormActions {
   setCodeSelector: (selector: string) => void;
   setPreExecutionSteps: (steps: string) => void;
   setMaxDepth: (depth: number | '') => void;
+  setScrapeType: (type: 'code' | 'documentation') => void;
   reset: () => void;
   validate: () => boolean;
 }
@@ -30,6 +32,7 @@ const initialState: WebScrapeFormState = {
   codeSelector: '',
   preExecutionSteps: '',
   maxDepth: '',
+  scrapeType: 'code',
 };
 
 export const useWebScrapeForm = () => {
@@ -63,6 +66,10 @@ export const useWebScrapeForm = () => {
     setState((prev: WebScrapeFormState) => ({ ...prev, maxDepth }));
   };
 
+  const setScrapeType = (scrapeType: 'code' | 'documentation') => {
+    setState((prev: WebScrapeFormState) => ({ ...prev, scrapeType }));
+  };
+
   const reset = () => {
     setState(initialState);
   };
@@ -80,6 +87,7 @@ export const useWebScrapeForm = () => {
     setCodeSelector,
     setPreExecutionSteps,
     setMaxDepth,
+    setScrapeType,
     reset,
     validate,
   };

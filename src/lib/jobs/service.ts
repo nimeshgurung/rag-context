@@ -14,6 +14,7 @@ export async function startCrawlJob(
   libraryName: string,
   libraryDescription: string,
   startUrl: string,
+  scrapeType: 'code' | 'documentation',
 ) {
   const jobId = uuidv4();
   const libraryId = slug(libraryName);
@@ -50,7 +51,9 @@ export async function startCrawlJob(
       description: libraryDescription,
       startUrl,
       type: 'web-scrape',
-      config: {},
+      config: {
+        scrapeType,
+      },
     };
 
     // Don't await, let it run in the background

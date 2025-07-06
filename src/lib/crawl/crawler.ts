@@ -3,6 +3,7 @@ import TurndownService from 'turndown';
 import { WebScrapeSource } from '../types';
 import { enqueueEmbeddingJobs, EmbeddingJobPayload } from '../jobs/storage';
 import { sendEvent } from '../events';
+import { crawlDocumentation } from './documentationCrawler';
 
 const turndownService = new TurndownService();
 
@@ -27,14 +28,19 @@ function getScopeGlob(url: string): string {
   return `${urlObject.origin}${finalPath}/**`;
 }
 
-export async function crawlSingleSource(
+async function crawlCode(
   jobId: string,
   source: WebScrapeSource,
   libraryId: string,
   libraryDescription: string,
 ) {
   const { startUrl, config } = source;
-  const { contentSelector, codeSelector, preExecutionSteps, maxDepth = 5 } = config;
+  const {
+    contentSelector,
+    codeSelector,
+    preExecutionSteps,
+    maxDepth = 5,
+  } = config;
 
   const scopeGlob = getScopeGlob(startUrl);
 
@@ -51,20 +57,25 @@ export async function crawlSingleSource(
       // Execute pre-execution steps if provided
       if (preExecutionSteps && preExecutionSteps.trim()) {
         try {
-          log.info(`[Job ${jobId}] Executing pre-execution steps for: ${request.url}`);
+          log.info(
+            `[Job ${jobId}] Executing pre-execution steps for: ${request.url}`,
+          );
           sendEvent(jobId, {
             type: 'progress',
             message: `Executing pre-steps for: ${request.url}`,
           });
-          
+
           // Execute the pre-execution steps as JavaScript code
           await page.evaluate(preExecutionSteps);
-          
+
           // Wait a bit for any dynamic content to load
           await page.waitForTimeout(1000);
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          log.warning(`[Job ${jobId}] Pre-execution steps failed for ${request.url}: ${errorMessage}`);
+          const errorMessage =
+            error instanceof Error ? error.message : 'Unknown error';
+          log.warning(
+            `[Job ${jobId}] Pre-execution steps failed for ${request.url}: ${errorMessage}`,
+          );
           sendEvent(jobId, {
             type: 'progress',
             message: `Pre-execution steps failed for: ${request.url}`,
@@ -140,4 +151,19 @@ export async function crawlSingleSource(
   );
   await crawler.run([startUrl]);
   console.log(`[Job ${jobId}] Crawl for ${libraryId} finished successfully.`);
+}
+
+export async function crawlSingleSource(
+  jobId: string,
+  source: WebScrapeSource,
+  libraryId: string,
+  libraryDescription: string,
+) {
+  const { scrapeType } = source.config;
+
+  if (scrapeType === 'documentation') {
+    await crawlDocumentation(jobId, source, libraryId, libraryDescription);
+  } else {
+    await crawlCode(jobId, source, libraryId, libraryDescription);
+  }
 }

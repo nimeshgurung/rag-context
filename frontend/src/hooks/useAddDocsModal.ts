@@ -93,6 +93,7 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
       description: formData.description,
       startUrl: formData.startUrl,
       config: {
+        scrapeType: formData.scrapeType,
         contentSelector: formData.contentSelector || undefined,
         codeSelector: formData.codeSelector || undefined,
         preExecutionSteps: formData.preExecutionSteps || undefined,
