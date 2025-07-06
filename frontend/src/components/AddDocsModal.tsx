@@ -48,7 +48,7 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
       aria-describedby="add-docs-modal-description"
     >
       <Box sx={style}>
-        {    isProcessing ? (
+        { isProcessing ? (
           <JobProgressDisplay progress={progress} />
         ) : (
           <>
