@@ -18,9 +18,6 @@ const Layout: React.FC = () => {
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Button variant="outlined" color="primary" size="small" component={Link} to="/add-source">
-              + Add Web Source
-            </Button>
             <Button variant="contained" color="primary" size="small" onClick={handleOpenModal}>
               + Add Docs
             </Button>

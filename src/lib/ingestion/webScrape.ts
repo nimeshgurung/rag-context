@@ -1,10 +1,10 @@
 import { embed } from 'ai';
 import slug from 'slug';
-import { openai } from '../../ai/service';
-import pool from '../../db';
-import { WebScrapeSource } from '../../types';
-import { sendEvent, closeConnection } from '../../events';
-import { crawlSingleSource } from '../../crawl/worker';
+import { openai } from '../ai/service';
+import pool from '../db';
+import { WebScrapeSource } from '../types';
+import { sendEvent, closeConnection } from '../events';
+import { crawlSingleSource } from '../crawl/crawler';
 
 export async function handleWebScrapeSource(
   jobId: string,

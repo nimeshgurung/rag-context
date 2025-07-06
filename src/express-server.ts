@@ -4,8 +4,6 @@ import {
   searchLibraries,
   fetchLibraryDocumentation,
   getUniqueLibraries,
-  addDocumentationSource,
-  startCrawlJob,
   getCrawlJobStatus,
   reprocessJob,
   deleteJob,
@@ -13,10 +11,12 @@ import {
   processAllJobs,
   getLatestJobForLibrary,
   deleteLibrary,
+  startCrawlJob,
 } from './lib/api';
 import { DocumentationSource } from './lib/types';
 import { addClient, removeClient } from './lib/events';
 import { v4 as uuidv4 } from 'uuid';
+import { addDocumentationSource } from './lib/ingestion';
 
 const app = express();
 const port = process.env.PORT || 3001;

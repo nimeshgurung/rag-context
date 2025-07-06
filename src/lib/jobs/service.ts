@@ -3,16 +3,13 @@ import slug from 'slug';
 import { embed } from 'ai';
 import pool from '../db';
 import { WebScrapeSource } from '../types';
-import { crawlSingleSource } from '../crawl/worker';
+import { crawlSingleSource } from '../crawl/crawler';
 import { exec } from 'child_process';
 import util from 'util';
 import { openai } from '../ai/service';
 import { getEnrichedDataFromLLM } from '../embedding/enrichment';
-import {
-  saveEnrichedData,
-  markJobAsCompleted,
-  markJobAsFailed,
-} from './storage';
+import { markJobAsCompleted, markJobAsFailed } from './storage';
+import { saveEnrichedData } from '../embedding/saveEnrichedData';
 
 const execAsync = util.promisify(exec);
 

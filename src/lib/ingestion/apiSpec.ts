@@ -4,12 +4,12 @@ import slug from 'slug';
 import path from 'path';
 import fs from 'fs/promises';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { openai } from '../../ai/service';
-import pool from '../../db';
-import { ApiSpecSource } from '../../types';
-import { sendEvent, closeConnection } from '../../events';
-import { SlopChunk } from '../../../types';
-import { convertToSlopChunks } from '../../../slop/converter';
+import { openai } from '../ai/service';
+import pool from '../db';
+import { ApiSpecSource } from '../types';
+import { sendEvent, closeConnection } from '../events';
+import { SlopChunk } from '../../types';
+import { convertToSlopChunks } from '../../slop/converter';
 
 export async function handleApiSpecSource(
   jobId: string,

@@ -1,5 +1,5 @@
-import { closeConnection } from '../../events';
-import { DocumentationSource } from '../../types';
+import { closeConnection } from '../events';
+import { DocumentationSource } from '../types';
 import { handleApiSpecSource } from './apiSpec';
 import { handleWebScrapeSource } from './webScrape';
 

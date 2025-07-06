@@ -3,11 +3,11 @@ import {
   fetchPendingJobs,
   markJobAsCompleted,
   markJobAsFailed,
-  saveEnrichedData,
-} from '../jobs/storage';
-import { getEnrichedDataFromLLM } from './enrichment';
-import pool from '../db';
+} from './storage';
+import { getEnrichedDataFromLLM } from '../embedding/enrichment';
 import { EnrichedItem } from '../types';
+import { saveEnrichedData } from '../embedding/saveEnrichedData';
+import pool from '../db';
 
 const RATE_LIMIT_PER_MINUTE = process.env.EMBEDDING_RATE_LIMIT
   ? parseInt(process.env.EMBEDDING_RATE_LIMIT, 10)
@@ -15,7 +15,7 @@ const RATE_LIMIT_PER_MINUTE = process.env.EMBEDDING_RATE_LIMIT
 const BATCH_SIZE = 10; // Number of jobs to fetch at once
 const PAUSE_BETWEEN_BATCHES = (60 / RATE_LIMIT_PER_MINUTE) * BATCH_SIZE * 1000; // time in ms to wait
 
-async function processQueue() {
+export async function processQueue() {
   console.log('Starting embedding worker...');
   console.log(
     `Rate limit: ${RATE_LIMIT_PER_MINUTE}/minute, Batch size: ${BATCH_SIZE}`,
