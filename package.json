@@ -22,7 +22,9 @@
     "dev:frontend": "npm run dev --prefix frontend",
     "crawl": "tsx scripts/run-crawler.ts",
     "clear-library": "tsx scripts/clear-library-data.ts",
-    "process-embeddings": "tsx src/lib/embedding/worker.ts"
+    "build:backend": "npx tsc -p tsconfig.json",
+    "dev:backend": "npx tsx watch src/server.ts",
+    "process-all": "tsx src/lib/jobs/worker.ts"
   },
   "keywords": [],
   "author": "",
@@ -62,7 +64,8 @@
     "ts-node": "^10.9.2",
     "turndown": "^7.2.0",
     "uuid": "^11.1.0",
-    "zod": "^3.25.67"
+    "zod": "^3.25.67",
+    "@changesets/cli": "^2.27.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

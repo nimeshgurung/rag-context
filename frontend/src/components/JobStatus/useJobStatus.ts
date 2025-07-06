@@ -25,29 +25,29 @@ export const useJobStatus = () => {
     try {
       const result = await getCrawlJobStatus(jobId);
       setStatus(result);
+      if (result.summary.pending === 0 && result.summary.processing === 0) {
+        setIsProcessing(false);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       setError(message || 'Failed to fetch job status.');
-      return true; // Stop polling on error
     }
-    return false;
   }, [jobId]);
 
   useEffect(() => {
+    if (!jobId) return;
     setIsLoading(true);
     fetchStatus().finally(() => setIsLoading(false));
+  }, [jobId, fetchStatus]);
 
-    // Use faster polling when processing is active
-    const pollInterval = isProcessing ? 2000 : 5000;
-    const intervalId = setInterval(async () => {
-      const shouldStop = await fetchStatus();
-      if (shouldStop) {
-        clearInterval(intervalId);
-      }
-    }, pollInterval);
+  useEffect(() => {
+    if (!jobId || isLoading) return;
 
-    return () => clearInterval(intervalId);
-  }, [fetchStatus, isProcessing]);
+    const interval = isProcessing ? 2000 : 5000;
+    const pollInterval = setInterval(fetchStatus, interval);
+
+    return () => clearInterval(pollInterval);
+  }, [jobId, isLoading, isProcessing, fetchStatus]);
 
   const handleReprocess = async (jobItemId: number) => {
     setIsReprocessing(jobItemId);
@@ -87,30 +87,18 @@ export const useJobStatus = () => {
   };
 
   const handleProcessAll = async () => {
+    if (!jobId) return;
+
     setIsProcessing(true);
     try {
-      await processAllJobs();
-      // Start monitoring the job status more frequently
-      const monitorInterval = setInterval(async () => {
-        const currentStatus = await getCrawlJobStatus(jobId!);
-        setStatus(currentStatus);
-        
-        // Stop monitoring when all jobs are no longer pending or processing
-        if (currentStatus.summary.pending === 0 && currentStatus.summary.processing === 0) {
-          clearInterval(monitorInterval);
-          setIsProcessing(false);
-        }
-      }, 1000); // Check every second during processing
-      
-      // Safety timeout to stop monitoring after 5 minutes
-      setTimeout(() => {
-        clearInterval(monitorInterval);
-        setIsProcessing(false);
-      }, 300000);
-      
+      await processAllJobs(jobId);
+      fetchStatus();
     } catch (err) {
-      console.error('Failed to start processing all jobs:', err);
-      alert('Failed to start processing all jobs.');
+      console.error(
+        'Failed to start processing all jobs for the library:',
+        err,
+      );
+      alert('An error occurred while starting job processing.');
       setIsProcessing(false);
     }
   };

@@ -4,8 +4,8 @@ import {
   reprocessJob,
   deleteJob,
   processSingleJob,
-  processAllJobs,
   startCrawlJob,
+  processAllJobs,
 } from '../lib/api';
 
 const router = express.Router();
@@ -117,15 +117,16 @@ router.post(
   },
 );
 
-// Process all jobs
+// Process all jobs for a specific library
 router.post(
-  '/process/all',
-  async (_req: Request, res: Response): Promise<void> => {
+  '/process/all/:jobId',
+  async (req: Request<{ jobId: string }>, res: Response): Promise<void> => {
+    const { jobId } = req.params;
     try {
-      const result = await processAllJobs();
+      const result = await processAllJobs(jobId);
       res.json(result);
     } catch (error) {
-      console.error('Failed to start all-job processing:', error);
+      console.error(`Failed to start all-job processing for ${jobId}:`, error);
       res.status(500).json({
         success: false,
         message:

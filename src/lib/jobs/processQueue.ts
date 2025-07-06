@@ -7,16 +7,18 @@ import {
 import { getEnrichedDataFromLLM } from '../embedding/enrichment';
 import { EnrichedItem } from '../types';
 import { saveEnrichedData } from '../embedding/saveEnrichedData';
-import pool from '../db';
 
 const RATE_LIMIT_PER_MINUTE = process.env.EMBEDDING_RATE_LIMIT
   ? parseInt(process.env.EMBEDDING_RATE_LIMIT, 10)
-  : 50; // Requests per minute
+  : 20; // Requests per minute
 const BATCH_SIZE = 10; // Number of jobs to fetch at once
 const PAUSE_BETWEEN_BATCHES = (60 / RATE_LIMIT_PER_MINUTE) * BATCH_SIZE * 1000; // time in ms to wait
 
-export async function processQueue() {
+export async function processQueue(jobId?: string) {
   console.log('Starting embedding worker...');
+  if (jobId) {
+    console.log(`Processing jobs scoped to jobId: ${jobId}`);
+  }
   console.log(
     `Rate limit: ${RATE_LIMIT_PER_MINUTE}/minute, Batch size: ${BATCH_SIZE}`,
   );
@@ -24,9 +26,13 @@ export async function processQueue() {
 
   while (true) {
     try {
-      const jobs = await fetchPendingJobs(BATCH_SIZE);
+      const jobs = await fetchPendingJobs(BATCH_SIZE, jobId);
       if (jobs.length === 0) {
         console.log('No pending jobs. Waiting for 5 seconds...');
+        if (jobId) {
+          console.log('Finished processing for scoped jobId. Exiting.');
+          break; // Exit loop if it was a scoped run and no jobs are left
+        }
         await new Promise((resolve) => setTimeout(resolve, 5000));
         continue;
       }
@@ -90,9 +96,3 @@ export async function processQueue() {
     }
   }
 }
-
-processQueue().catch(async (e) => {
-  console.error('Worker process failed:', e);
-  await pool.end();
-  process.exit(1);
-});

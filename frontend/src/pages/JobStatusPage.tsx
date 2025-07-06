@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Container,
   Typography,
@@ -63,17 +62,17 @@ const JobStatusPage = () => {
             <JobSummary summary={status.summary} />
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <Box sx={{ width: '100%', mr: 1 }}>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={progress} 
-                  sx={{ 
-                    height: 10, 
+                <LinearProgress
+                  variant="determinate"
+                  value={progress}
+                  sx={{
+                    height: 10,
                     borderRadius: 5,
                     backgroundColor: '#e0e0e0',
                     '& .MuiLinearProgress-bar': {
                       backgroundColor: isProcessing ? '#2196f3' : '#4caf50',
                     },
-                  }} 
+                  }}
                 />
               </Box>
               <Box sx={{ minWidth: 35 }}>
@@ -88,20 +87,19 @@ const JobStatusPage = () => {
                 <Typography variant="body2" color="primary">
                   Processing jobs in the background...
                 </Typography>
-                <Chip 
-                  label={`${status.summary.processing} processing`} 
-                  color="info" 
-                  size="small" 
+                <Chip
+                  label={`${status.summary.processing} processing`}
+                  color="info"
+                  size="small"
                 />
-                <Chip 
-                  label={`${status.summary.pending} pending`} 
-                  color="warning" 
-                  size="small" 
+                <Chip
+                  label={`${status.summary.pending} pending`}
+                  color="warning"
+                  size="small"
                 />
               </Box>
             )}
           </Box>
-
           <JobActions
             filterText={filterText}
             onFilterChange={handleFilterChange}
@@ -112,7 +110,6 @@ const JobStatusPage = () => {
             isActionPending={isActionPending}
             isProcessing={isProcessing}
           />
-
           <JobsTable
             jobs={filteredJobs}
             selectedJobIds={selectedJobIds}

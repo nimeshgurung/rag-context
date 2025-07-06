@@ -4,14 +4,11 @@ import { embed } from 'ai';
 import pool from '../db';
 import { WebScrapeSource } from '../types';
 import { crawlSingleSource } from '../crawl/crawler';
-import { exec } from 'child_process';
-import util from 'util';
+import { spawn } from 'child_process';
 import { openai } from '../ai/service';
 import { getEnrichedDataFromLLM } from '../embedding/enrichment';
 import { markJobAsCompleted, markJobAsFailed } from './storage';
 import { saveEnrichedData } from '../embedding/saveEnrichedData';
-
-const execAsync = util.promisify(exec);
 
 export async function startCrawlJob(
   libraryName: string,
@@ -159,20 +156,37 @@ export async function processSingleJob(jobItemId: number) {
   }
 }
 
-export async function processAllJobs() {
+export async function processAllJobs(jobId: string) {
   try {
-    // Start the worker script as a background process
-    const { stdout, stderr } = await execAsync('npm run process-embeddings');
-    console.log('Worker process started:', stdout);
-    if (stderr) {
-      console.error('Worker process stderr:', stderr);
-    }
+    const workerCommand = 'npm';
+    const workerArgs = ['run', 'process-all', '--', jobId];
+
+    console.log(
+      `Spawning worker for jobId: ${jobId} with command: ${workerCommand} ${workerArgs.join(
+        ' ',
+      )}`,
+    );
+
+    const child = spawn(workerCommand, workerArgs, {
+      detached: true,
+      stdio: 'inherit', // This pipes the child's logs to the parent
+    });
+
+    child.on('error', (err) => {
+      console.error(`Failed to start worker process for jobId ${jobId}:`, err);
+    });
+
+    child.unref();
+
     return {
       success: true,
-      message: 'Embedding worker process started in the background.',
+      message: `Embedding worker process for ${jobId} started in the background.`,
     };
   } catch (error) {
-    console.error('Failed to start embedding worker process:', error);
+    console.error(
+      `Failed to start embedding worker process for ${jobId}:`,
+      error,
+    );
     throw new Error('Failed to start embedding worker process.');
   }
 }

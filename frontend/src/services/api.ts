@@ -152,8 +152,8 @@ export async function processSingleJob(jobItemId: number) {
   return response.json();
 }
 
-export async function processAllJobs() {
-  const response = await fetch(`${API_BASE_URL}/crawl/process/all`, {
+export async function processAllJobs(jobId: string) {
+  const response = await fetch(`${API_BASE_URL}/crawl/process/all/${jobId}`, {
     method: 'POST',
   });
   return response.json();
