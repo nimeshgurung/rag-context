@@ -1,49 +1,21 @@
-import React, { useState } from 'react';
-import {
-  Modal,
-  Box,
-  Typography,
-  Tabs,
-  Tab,
-} from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
 import { addDocumentationSource } from '../services/api';
-import type { ApiSpecSource, WebScrapeSource } from '../../../src/lib/types';
 import { useDialog } from '../context/DialogProvider';
-import { useJobProgress } from '../hooks/useJobProgress';
-import { useApiSpecForm } from '../hooks/useApiSpecForm';
-import { useWebScrapeForm } from '../hooks/useWebScrapeForm';
-import ApiSpecForm from './forms/ApiSpecForm';
-import WebScrapeForm from './forms/WebScrapeForm';
-import JobProgressDisplay from './JobProgressDisplay';
-import TabPanel from './TabPanel';
+import { useJobProgress } from './useJobProgress';
+import { useApiSpecForm } from './useApiSpecForm';
+import { useWebScrapeForm } from './useWebScrapeForm';
+import type { ApiSpecSource, WebScrapeSource } from '../../../src/lib/types';
 
-interface AddDocsModalProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-const style = {
-  position: 'absolute' as const,
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 600,
-  bgcolor: 'background.paper',
-  border: '1px solid #000',
-  boxShadow: 24,
-  p: 4,
-  borderRadius: '8px',
-};
-
-const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
+export const useAddDocsModal = (open: boolean, onClose: () => void) => {
   const [activeTab, setActiveTab] = useState(0);
   const { showDialog } = useDialog();
   const jobProgress = useJobProgress();
   const apiSpecForm = useApiSpecForm();
   const webScrapeForm = useWebScrapeForm();
 
-  // Reset forms when modal closes
-  React.useEffect(() => {
+  // Reset all forms when modal closes
+  useEffect(() => {
     if (!open) {
       jobProgress.reset();
       apiSpecForm.reset();
@@ -52,17 +24,11 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
     }
   }, [open, jobProgress, apiSpecForm, webScrapeForm]);
 
-  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = useCallback((_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
-    if (!jobProgress.isProcessing) {
-      onClose();
-    }
-  };
-
-  const handleApiSpecSubmit = async (formData: ReturnType<typeof useApiSpecForm>) => {
+  const handleApiSpecSubmit = useCallback(async (formData: ReturnType<typeof useApiSpecForm>) => {
     if (!formData.validate()) {
       showDialog(
         'Missing Information',
@@ -108,9 +74,9 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
       jobProgress.addProgress('Error submitting job.');
       setTimeout(() => onClose(), 3000);
     }
-  };
+  }, [jobProgress, showDialog, onClose]);
 
-  const handleWebScrapeSubmit = async (formData: ReturnType<typeof useWebScrapeForm>) => {
+  const handleWebScrapeSubmit = useCallback(async (formData: ReturnType<typeof useWebScrapeForm>) => {
     if (!formData.validate()) {
       showDialog(
         'Missing Information',
@@ -156,53 +122,15 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
         showDialog('Error', 'An unknown error occurred.');
       }
     }
+  }, [jobProgress, showDialog, onClose]);
+
+  return {
+    activeTab,
+    handleTabChange,
+    handleApiSpecSubmit,
+    handleWebScrapeSubmit,
+    jobProgress,
+    apiSpecForm,
+    webScrapeForm,
   };
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleCloseModal}
-      aria-labelledby="add-docs-modal-title"
-      aria-describedby="add-docs-modal-description"
-    >
-      <Box sx={style}>
-        {jobProgress.isProcessing ? (
-          <JobProgressDisplay progress={jobProgress.progress} />
-        ) : (
-          <>
-            <Typography id="add-docs-modal-title" variant="h6" component="h2">
-              Add New Documentation
-            </Typography>
-
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 2 }}>
-              <Tabs
-                value={activeTab}
-                onChange={handleTabChange}
-                aria-label="add docs tabs"
-              >
-                <Tab label="API Specification" />
-                <Tab label="Web Scrape" />
-              </Tabs>
-            </Box>
-
-            <TabPanel value={activeTab} index={0}>
-              <ApiSpecForm
-                onSubmit={handleApiSpecSubmit}
-                onCancel={onClose}
-              />
-            </TabPanel>
-
-            <TabPanel value={activeTab} index={1}>
-              <WebScrapeForm
-                onSubmit={handleWebScrapeSubmit}
-                onCancel={onClose}
-              />
-            </TabPanel>
-          </>
-        )}
-      </Box>
-    </Modal>
-  );
 };
-
-export default AddDocsModal;
