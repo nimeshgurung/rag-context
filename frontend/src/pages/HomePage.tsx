@@ -170,7 +170,7 @@ const HomePage: React.FC = () => {
                       {checkingJobId === row.libraryId ? (
                         <CircularProgress size={20} />
                       ) : (
-                        'View Last Job'
+                        'View Jobs'
                       )}
                     </Button>
                     <Button

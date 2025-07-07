@@ -1,8 +1,11 @@
 import React from 'react';
 import {
-  Modal,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
   Box,
-  Typography,
   Tabs,
   Tab,
 } from '@mui/material';
@@ -12,27 +15,25 @@ import WebScrapeForm from './forms/WebScrapeForm';
 import JobProgressDisplay from './JobProgressDisplay';
 import TabPanel from './TabPanel';
 import { useAddDocsModal } from '../hooks/useAddDocsModal';
+import { useApiSpecForm } from '../hooks/useApiSpecForm';
+import { useWebScrapeForm } from '../hooks/useWebScrapeForm';
 
 interface AddDocsModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-const style = {
-  position: 'absolute' as const,
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 600,
-  bgcolor: 'background.paper',
-  border: '1px solid #000',
-  boxShadow: 24,
-  p: 4,
-  borderRadius: '8px',
-};
-
 const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
-  const { activeTab, handleTabChange, handleApiSpecSubmit, handleWebScrapeSubmit, isProcessing, progress } = useAddDocsModal(open, onClose);
+  const {
+    activeTab,
+    handleTabChange,
+    handleApiSpecSubmit,
+    handleWebScrapeSubmit,
+    isProcessing,
+    progress,
+  } = useAddDocsModal(open, onClose);
+  const apiSpecFormData = useApiSpecForm();
+  const webScrapeFormData = useWebScrapeForm();
 
   const handleCloseModal = () => {
     if (!isProcessing) {
@@ -40,23 +41,31 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
     }
   };
 
+  const handleSubmit = () => {
+    if (activeTab === 0) {
+      handleApiSpecSubmit(apiSpecFormData);
+    } else {
+      handleWebScrapeSubmit(webScrapeFormData);
+    }
+  };
+
   return (
-    <Modal
+    <Dialog
       open={open}
       onClose={handleCloseModal}
       aria-labelledby="add-docs-modal-title"
-      aria-describedby="add-docs-modal-description"
+      fullWidth
+      maxWidth="md"
     >
-      <Box sx={style}>
-        { isProcessing ? (
+      <DialogTitle id="add-docs-modal-title">
+        Add New Documentation
+      </DialogTitle>
+      <DialogContent dividers>
+        {isProcessing ? (
           <JobProgressDisplay progress={progress} />
         ) : (
           <>
-            <Typography id="add-docs-modal-title" variant="h6" component="h2">
-              Add New Documentation
-            </Typography>
-
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 2 }}>
+            <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
               <Tabs
                 value={activeTab}
                 onChange={handleTabChange}
@@ -68,22 +77,24 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
             </Box>
 
             <TabPanel value={activeTab} index={0}>
-              <ApiSpecForm
-                onSubmit={handleApiSpecSubmit}
-                onCancel={onClose}
-              />
+              <ApiSpecForm formData={apiSpecFormData} />
             </TabPanel>
 
             <TabPanel value={activeTab} index={1}>
-              <WebScrapeForm
-                onSubmit={handleWebScrapeSubmit}
-                onCancel={onClose}
-              />
+              <WebScrapeForm formData={webScrapeFormData} />
             </TabPanel>
           </>
         )}
-      </Box>
-    </Modal>
+      </DialogContent>
+      {!isProcessing && (
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained">
+            Submit
+          </Button>
+        </DialogActions>
+      )}
+    </Dialog>
   );
 };
 

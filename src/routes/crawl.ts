@@ -75,12 +75,12 @@ router.delete(
 
 // Process a single job item
 router.post(
-  '/process/single/:id',
+  '/process/single',
   async (
-    req: Request<{ id: string }, object, { id: number }>,
+    req: Request<object, { id: string }>,
     res: Response,
   ): Promise<void> => {
-    const { id } = req.params;
+    const { id } = req.body;
     console.warn('Processing job item', id);
     try {
       const result = await processSingleJob(parseInt(id, 10));

@@ -13,12 +13,10 @@ import {
 import { useApiSpecForm } from '../../hooks/useApiSpecForm';
 
 interface ApiSpecFormProps {
-  onSubmit: (formData: ReturnType<typeof useApiSpecForm>) => void;
-  onCancel: () => void;
+  formData: ReturnType<typeof useApiSpecForm>;
 }
 
-const ApiSpecForm: React.FC<ApiSpecFormProps> = ({ onSubmit, onCancel }) => {
-  const formData = useApiSpecForm();
+const ApiSpecForm: React.FC<ApiSpecFormProps> = ({ formData }) => {
   const {
     libraryName,
     description,
@@ -36,10 +34,6 @@ const ApiSpecForm: React.FC<ApiSpecFormProps> = ({ onSubmit, onCancel }) => {
     if (event.target.files) {
       setFile(event.target.files[0]);
     }
-  };
-
-  const handleSubmit = () => {
-    onSubmit(formData);
   };
 
   return (
@@ -111,14 +105,6 @@ const ApiSpecForm: React.FC<ApiSpecFormProps> = ({ onSubmit, onCancel }) => {
           onChange={(e) => setTextContent(e.target.value)}
         />
       )}
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button onClick={onCancel} sx={{ mr: 1 }}>
-          Cancel
-        </Button>
-        <Button variant="contained" onClick={handleSubmit}>
-          Submit
-        </Button>
-      </Box>
     </Box>
   );
 };

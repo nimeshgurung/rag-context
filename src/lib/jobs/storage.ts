@@ -7,7 +7,8 @@ export interface EmbeddingJobPayload {
   libraryDescription: string;
   sourceUrl: string;
   rawSnippets: string[];
-  contextMarkdown: string;
+  contextMarkdown?: string;
+  scrapeType: 'code' | 'documentation';
 }
 
 export async function enqueueEmbeddingJobs(jobs: EmbeddingJobPayload[]) {
@@ -20,8 +21,8 @@ export async function enqueueEmbeddingJobs(jobs: EmbeddingJobPayload[]) {
     await client.query('BEGIN');
 
     const query = `
-      INSERT INTO embedding_jobs (job_id, library_id, library_name, library_description, source_url, raw_snippets, context_markdown)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO embedding_jobs (job_id, library_id, library_name, library_description, source_url, raw_snippets, context_markdown, scrape_type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     `;
 
     for (const job of jobs) {
@@ -33,6 +34,7 @@ export async function enqueueEmbeddingJobs(jobs: EmbeddingJobPayload[]) {
         job.sourceUrl,
         JSON.stringify(job.rawSnippets),
         job.contextMarkdown,
+        job.scrapeType,
       ];
       await client.query(query, values);
     }
@@ -81,6 +83,7 @@ export async function fetchPendingJobs(
       sourceUrl: row.source_url,
       rawSnippets: row.raw_snippets,
       contextMarkdown: row.context_markdown,
+      scrapeType: row.scrape_type,
     }));
 
     if (jobs.length > 0) {

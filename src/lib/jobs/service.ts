@@ -8,7 +8,11 @@ import { spawn } from 'child_process';
 import { openai } from '../ai/service';
 import { getEnrichedDataFromLLM } from '../embedding/enrichment';
 import { markJobAsCompleted, markJobAsFailed } from './storage';
-import { saveEnrichedData } from '../embedding/saveEnrichedData';
+import {
+  saveDocumentationChunks,
+  saveEnrichedCodeSnippets,
+} from '../embedding/saveEnrichedData';
+import { EnrichedItem } from '../types';
 
 export async function startCrawlJob(
   libraryName: string,
@@ -147,20 +151,9 @@ export async function processSingleJob(jobItemId: number) {
       return { success: true, message: 'Job has no snippets.' };
     }
 
-    const enrichedItems = [];
-    for (const snippet of job.raw_snippets) {
-      const enrichedData = await getEnrichedDataFromLLM(
-        snippet,
-        job.context_markdown,
-      );
-      if (enrichedData) {
-        enrichedItems.push(enrichedData);
-      }
-    }
-
-    if (enrichedItems.length > 0) {
-      await saveEnrichedData(
-        enrichedItems,
+    if (job.scrape_type === 'documentation') {
+      await saveDocumentationChunks(
+        job.raw_snippets,
         {
           libraryId: job.library_id,
           libraryName: job.library_name,
@@ -168,6 +161,29 @@ export async function processSingleJob(jobItemId: number) {
         },
         job.source_url,
       );
+    } else {
+      const enrichedItems: EnrichedItem[] = [];
+      for (const snippet of job.raw_snippets) {
+        const enrichedData = await getEnrichedDataFromLLM(
+          snippet,
+          job.context_markdown,
+        );
+        if (enrichedData) {
+          enrichedItems.push(enrichedData);
+        }
+      }
+
+      if (enrichedItems.length > 0) {
+        await saveEnrichedCodeSnippets(
+          enrichedItems,
+          {
+            libraryId: job.library_id,
+            libraryName: job.library_name,
+            libraryDescription: job.library_description,
+          },
+          job.source_url,
+        );
+      }
     }
 
     await markJobAsCompleted(job.id);

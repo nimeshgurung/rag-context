@@ -91,7 +91,7 @@ export async function fetchLibraryDocumentation(
         FROM
           slop_embeddings
         WHERE
-          library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
+          library_id = $1
         ORDER BY
           similarity_score DESC
         LIMIT 20
@@ -138,7 +138,7 @@ export async function fetchLibraryDocumentation(
       FROM
         slop_embeddings se
       WHERE
-        library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example');
+        library_id = $1
     `;
     queryParams = [context7CompatibleLibraryID];
   }

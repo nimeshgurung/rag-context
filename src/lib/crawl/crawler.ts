@@ -35,17 +35,12 @@ async function crawlCode(
   libraryDescription: string,
 ) {
   const { startUrl, config } = source;
-  const {
-    contentSelector,
-    codeSelector,
-    preExecutionSteps,
-    maxDepth = 5,
-  } = config;
+  const { contentSelector, codeSelector, preExecutionSteps } = config;
 
   const scopeGlob = getScopeGlob(startUrl);
 
   const crawler = new PlaywrightCrawler({
-    maxRequestsPerCrawl: maxDepth,
+    maxRequestsPerCrawl: 1000,
     maxConcurrency: 1,
     async requestHandler({ request, page, enqueueLinks, log }) {
       log.info(`[Job ${jobId}] Processing: ${request.url}`);
@@ -120,6 +115,7 @@ async function crawlCode(
           (snippet) => snippet?.trim() !== '',
         ),
         contextMarkdown,
+        scrapeType: 'code',
       };
 
       if (job.rawSnippets.length > 0) {

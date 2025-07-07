@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Box,
   TextField,
-  Button,
   Typography,
   Radio,
   RadioGroup,
@@ -13,12 +12,10 @@ import {
 import { useWebScrapeForm } from '../../hooks/useWebScrapeForm';
 
 interface WebScrapeFormProps {
-  onSubmit: (formData: ReturnType<typeof useWebScrapeForm>) => void;
-  onCancel: () => void;
+  formData: ReturnType<typeof useWebScrapeForm>;
 }
 
-const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ onSubmit, onCancel }) => {
-  const formData = useWebScrapeForm();
+const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData }) => {
   const {
     libraryName,
     description,
@@ -37,10 +34,6 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ onSubmit, onCancel }) => 
     setMaxDepth,
     setScrapeType,
   } = formData;
-
-  const handleSubmit = () => {
-    onSubmit(formData);
-  };
 
   return (
     <Box
@@ -83,7 +76,11 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ onSubmit, onCancel }) => 
             setScrapeType(e.target.value as 'code' | 'documentation')
           }
         >
-          <FormControlLabel value="code" control={<Radio />} label="Code-focused" />
+          <FormControlLabel
+            value="code"
+            control={<Radio />}
+            label="Code-focused"
+          />
           <FormControlLabel
             value="documentation"
             control={<Radio />}
@@ -128,14 +125,6 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ onSubmit, onCancel }) => 
         }
         size="small"
       />
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button onClick={onCancel} sx={{ mr: 1 }}>
-          Cancel
-        </Button>
-        <Button variant="contained" onClick={handleSubmit}>
-          Submit
-        </Button>
-      </Box>
     </Box>
   );
 };

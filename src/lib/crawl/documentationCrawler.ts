@@ -2,12 +2,15 @@ import { PlaywrightCrawler } from 'crawlee';
 import TurndownService from 'turndown';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
-import { MarkdownTextSplitter } from 'langchain/text_splitter';
 import { WebScrapeSource } from '../types';
 import { enqueueEmbeddingJobs, EmbeddingJobPayload } from '../jobs/storage';
 import { sendEvent } from '../events';
+import { MarkdownHeaderTextSplitter } from '../splitters/markdownHeaderTextSplitter';
 
-const turndownService = new TurndownService();
+const turndownService = new TurndownService({
+  headingStyle: 'atx',
+  codeBlockStyle: 'fenced',
+});
 
 function getScopeGlob(url: string): string {
   const urlObject = new URL(url);
@@ -33,13 +36,12 @@ export async function crawlDocumentation(
   libraryId: string,
   libraryDescription: string,
 ) {
-  const { startUrl, config } = source;
-  const { maxDepth = 5 } = config;
+  const { startUrl } = source;
 
   const scopeGlob = getScopeGlob(startUrl);
 
   const crawler = new PlaywrightCrawler({
-    maxRequestsPerCrawl: maxDepth,
+    maxRequestsPerCrawl: 1000,
     maxConcurrency: 1,
     async requestHandler({ request, page, enqueueLinks, log }) {
       log.info(`[Job ${jobId}] Processing documentation: ${request.url}`);
@@ -57,13 +59,20 @@ export async function crawlDocumentation(
         log.warning(`No readable content found on ${request.url}. Skipping.`);
         return;
       }
-
       const markdown = turndownService.turndown(article.content);
 
-      const splitter = new MarkdownTextSplitter({
-        chunkSize: 1000,
-        chunkOverlap: 100,
-      });
+      const splitter = new MarkdownHeaderTextSplitter(
+        [
+          ['#', 'h1'],
+          ['##', 'h2'],
+          ['###', 'h3'],
+          ['####', 'h4'],
+          ['#####', 'h5'],
+          ['######', 'h6'],
+        ],
+        false,
+        false,
+      );
 
       const chunks = await splitter.splitText(markdown);
 
@@ -73,8 +82,8 @@ export async function crawlDocumentation(
         libraryName: source.name,
         libraryDescription,
         sourceUrl: request.url,
-        rawSnippets: chunks.filter((chunk) => chunk?.trim() !== ''),
-        contextMarkdown: '', // No separate context for documentation
+        rawSnippets: chunks.map((chunk) => chunk.pageContent).filter(Boolean),
+        scrapeType: 'documentation',
       };
 
       if (job.rawSnippets.length > 0) {

@@ -6,6 +6,7 @@ CREATE TABLE embedding_jobs (
     library_name TEXT,
     library_description TEXT,
     source_url TEXT NOT NULL,
+    scrape_type TEXT,
     context_markdown TEXT,
     raw_snippets JSONB,
     status VARCHAR(20) DEFAULT 'pending',
