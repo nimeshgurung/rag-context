@@ -14,36 +14,68 @@ import { convertToSlopChunks } from '../../slop/converter';
 export async function handleApiSpecSource(
   jobId: string,
   source: ApiSpecSource,
+  existingLibraryId?: string,
 ) {
   try {
-    sendEvent(jobId, {
-      type: 'progress',
-      message: 'Creating library entry...',
-    });
-    const libraryId = slug(source.name);
+    let libraryId: string;
+    
+    if (existingLibraryId) {
+      // Use existing library
+      libraryId = existingLibraryId;
+      
+      // Verify library exists
+      const { rows: existing } = await pool.query(
+        'SELECT id, name, description FROM libraries WHERE id = $1',
+        [libraryId],
+      );
+      
+      if (existing.length === 0) {
+        throw new Error(`Library with id "${libraryId}" does not exist.`);
+      }
+      
+      sendEvent(jobId, {
+        type: 'progress',
+        message: `Adding API spec to existing library: ${existing[0].name}`,
+      });
+    } else {
+      // Create new library (existing behavior)
+      sendEvent(jobId, {
+        type: 'progress',
+        message: 'Creating library entry...',
+      });
+      
+      libraryId = slug(source.name);
 
-    const { rows: existing } = await pool.query(
-      'SELECT id FROM libraries WHERE id = $1',
-      [libraryId],
-    );
-    if (existing.length > 0) {
-      throw new Error(`Library with name "${source.name}" already exists.`);
+      const { rows: existing } = await pool.query(
+        'SELECT id FROM libraries WHERE id = $1',
+        [libraryId],
+      );
+      if (existing.length > 0) {
+        throw new Error(`Library with name "${source.name}" already exists.`);
+      }
+
+      const { embedding } = await embed({
+        model: openai.embedding('text-embedding-3-small'),
+        value: `${source.name}: ${source.description}`,
+      });
+
+      await pool.query(
+        'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
+        [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
+      );
+
+      sendEvent(jobId, {
+        type: 'progress',
+        message: 'Library entry created.',
+      });
     }
 
-    const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
-      value: `${source.name}: ${source.description}`,
-    });
-
-    await pool.query(
-      'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
-      [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
-    );
-
+    // Store spec file
     sendEvent(jobId, {
       type: 'progress',
-      message: 'Library entry created. Storing spec file...',
+      message: 'Storing spec file...',
     });
+    
     const storageDir = path.join(process.cwd(), 'storage', 'specs');
     await fs.mkdir(storageDir, { recursive: true });
 
@@ -51,7 +83,13 @@ export async function handleApiSpecSource(
       source.sourceType === 'file' && source.content.trim().startsWith('{')
         ? 'json'
         : 'yaml';
-    const filePath = path.join(storageDir, `${libraryId}.${extension}`);
+    
+    // For existing libraries, append timestamp to avoid overwriting
+    const filename = existingLibraryId 
+      ? `${libraryId}_${Date.now()}.${extension}`
+      : `${libraryId}.${extension}`;
+    
+    const filePath = path.join(storageDir, filename);
     await fs.writeFile(filePath, source.content);
 
     sendEvent(jobId, {
@@ -64,7 +102,9 @@ export async function handleApiSpecSource(
     if (chunks.length === 0) {
       closeConnection(jobId, {
         type: 'done',
-        message: `Library ${libraryId} created, but no content was ingested.`,
+        message: existingLibraryId
+          ? `API spec added to library ${libraryId}, but no content was ingested.`
+          : `Library ${libraryId} created, but no content was ingested.`,
       });
       return;
     }
@@ -111,9 +151,12 @@ export async function handleApiSpecSource(
     } finally {
       client.release();
     }
+    
     closeConnection(jobId, {
       type: 'done',
-      message: `Library ${libraryId} created and ingested successfully.`,
+      message: existingLibraryId
+        ? `API spec added to library ${libraryId} and ingested successfully.`
+        : `Library ${libraryId} created and ingested successfully.`,
     });
   } catch (error) {
     console.error(`[Job ${jobId}] Error in handleApiSpecSource:`, error);

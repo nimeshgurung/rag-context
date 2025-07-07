@@ -21,6 +21,7 @@ import {
   deleteLibrary,
 } from '../services/api';
 import { useDialog } from '../context/DialogProvider';
+import AddResourceModal from '../components/AddResourceModal';
 
 interface Library {
   libraryId: string;
@@ -35,6 +36,8 @@ const HomePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [checkingJobId, setCheckingJobId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [resourceModalOpen, setResourceModalOpen] = useState(false);
+  const [selectedLibrary, setSelectedLibrary] = useState<{ id: string; name: string } | null>(null);
   const navigate = useNavigate();
   const { showDialog, showConfirm } = useDialog();
 
@@ -103,6 +106,16 @@ const HomePage: React.FC = () => {
         }
       },
     );
+  };
+
+  const handleAddResource = (libraryId: string, libraryName: string) => {
+    setSelectedLibrary({ id: libraryId, name: libraryName });
+    setResourceModalOpen(true);
+  };
+
+  const handleResourceModalClose = () => {
+    setResourceModalOpen(false);
+    setSelectedLibrary(null);
   };
 
   const filteredLibraries = libraries.filter(
@@ -176,6 +189,15 @@ const HomePage: React.FC = () => {
                     <Button
                       variant="outlined"
                       size="small"
+                      color="primary"
+                      onClick={() => handleAddResource(row.libraryId, row.name)}
+                      sx={{ ml: 1 }}
+                    >
+                      Add Resource
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
                       color="error"
                       onClick={() =>
                         handleDeleteLibrary(row.libraryId, row.name)
@@ -196,6 +218,15 @@ const HomePage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+      
+      {selectedLibrary && (
+        <AddResourceModal
+          open={resourceModalOpen}
+          onClose={handleResourceModalClose}
+          libraryId={selectedLibrary.id}
+          libraryName={selectedLibrary.name}
+        />
+      )}
     </Box>
   );
 };

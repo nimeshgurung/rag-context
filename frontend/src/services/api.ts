@@ -175,3 +175,22 @@ export async function deleteLibrary(
   }
   return response.json();
 }
+
+export async function addLibraryResource(
+  libraryId: string,
+  source: DocumentationSource,
+): Promise<{ jobId: string }> {
+  const response = await fetch(`${API_BASE_URL}/libraries/${encodeURIComponent(libraryId)}/add-resource`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(source),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to add resource to library');
+  }
+
+  return response.json();
+}

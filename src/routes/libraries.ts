@@ -38,7 +38,7 @@ router.post('/search', async (req: Request, res: Response) => {
   }
 });
 
-// Add documentation source
+// Add documentation source (creates new library)
 router.post('/add-source', async (req: Request, res: Response) => {
   const source = req.body as DocumentationSource;
 
@@ -54,6 +54,27 @@ router.post('/add-source', async (req: Request, res: Response) => {
 
   res.status(202).json({ jobId });
 });
+
+// Add resource to existing library
+router.post(
+  '/:libraryId/add-resource',
+  async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
+    const { libraryId } = req.params;
+    const source = req.body as DocumentationSource;
+
+    if (!source || !source.type) {
+      res.status(400).json({ error: 'Invalid source data' });
+      return;
+    }
+
+    const jobId = uuidv4();
+
+    // Don't await, let it run in the background
+    addDocumentationSource(jobId, source, libraryId);
+
+    res.status(202).json({ jobId });
+  },
+);
 
 // Get latest job for a library
 router.get(
