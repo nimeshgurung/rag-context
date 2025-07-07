@@ -13,9 +13,10 @@ import { useWebScrapeForm } from '../../hooks/useWebScrapeForm';
 
 interface WebScrapeFormProps {
   formData: ReturnType<typeof useWebScrapeForm>;
+  hideLibraryFields?: boolean;
 }
 
-const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData }) => {
+const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData, hideLibraryFields = false }) => {
   const {
     libraryName,
     description,
@@ -42,28 +43,33 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData }) => {
       autoComplete="off"
       sx={{ '& .MuiTextField-root': { m: 1, width: '95%' } }}
     >
-      <TextField
-        required
-        label="Library Name"
-        value={libraryName}
-        onChange={(e) => setLibraryName(e.target.value)}
-        size="small"
-      />
-      <TextField
-        required
-        label="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        multiline
-        rows={2}
-        size="small"
-      />
+      {!hideLibraryFields && (
+        <>
+          <TextField
+            required
+            label="Library Name"
+            value={libraryName}
+            onChange={(e) => setLibraryName(e.target.value)}
+            size="small"
+          />
+          <TextField
+            required
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            multiline
+            rows={2}
+            size="small"
+          />
+        </>
+      )}
       <TextField
         required
         label="Start URL"
         value={startUrl}
         onChange={(e) => setStartUrl(e.target.value)}
         size="small"
+        helperText={hideLibraryFields ? "The URL to crawl for additional documentation or code examples" : undefined}
       />
       <FormControl component="fieldset" sx={{ m: 1, width: '95%' }}>
         <FormLabel component="legend">Scrape Type</FormLabel>

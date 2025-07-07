@@ -3,6 +3,7 @@ import {
   searchLibraries,
   getUniqueLibraries,
   getLatestJobForLibrary,
+  getAllJobsForLibrary,
   deleteLibrary,
 } from '../lib/api';
 import { DocumentationSource } from '../lib/types';
@@ -38,7 +39,7 @@ router.post('/search', async (req: Request, res: Response) => {
   }
 });
 
-// Add documentation source
+// Add documentation source (creates new library)
 router.post('/add-source', async (req: Request, res: Response) => {
   const source = req.body as DocumentationSource;
 
@@ -55,6 +56,27 @@ router.post('/add-source', async (req: Request, res: Response) => {
   res.status(202).json({ jobId });
 });
 
+// Add resource to existing library
+router.post(
+  '/:libraryId/add-resource',
+  async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
+    const { libraryId } = req.params;
+    const source = req.body as DocumentationSource;
+
+    if (!source || !source.type) {
+      res.status(400).json({ error: 'Invalid source data' });
+      return;
+    }
+
+    const jobId = uuidv4();
+
+    // Don't await, let it run in the background
+    addDocumentationSource(jobId, source, libraryId);
+
+    res.status(202).json({ jobId });
+  },
+);
+
 // Get latest job for a library
 router.get(
   '/:libraryId/latest-job',
@@ -68,6 +90,25 @@ router.get(
         `Failed to get latest job for library ${libraryId}:`,
         error,
       );
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    }
+  },
+);
+
+// Get all jobs for a library
+router.get(
+  '/:libraryId/jobs',
+  async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
+    const { libraryId } = req.params;
+    try {
+      const result = await getAllJobsForLibrary(libraryId);
+      res.json(result);
+    } catch (error) {
+      console.error(`Failed to get jobs for library ${libraryId}:`, error);
       res.status(500).json({
         success: false,
         message:
