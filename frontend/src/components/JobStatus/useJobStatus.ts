@@ -62,7 +62,7 @@ export const useJobStatus = () => {
           console.error('Failed to delete job:', err);
           showSnackbar('Failed to delete job', 'error');
         }
-      }
+      },
     );
   };
 
@@ -129,9 +129,12 @@ export const useJobStatus = () => {
           fetchStatus();
         } catch (err) {
           console.error('Failed to delete selected jobs:', err);
-          showSnackbar('An error occurred while deleting selected jobs', 'error');
+          showSnackbar(
+            'An error occurred while deleting selected jobs',
+            'error',
+          );
         }
-      }
+      },
     );
   };
 

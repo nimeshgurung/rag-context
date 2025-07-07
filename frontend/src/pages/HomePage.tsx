@@ -49,7 +49,7 @@ const HomePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showDialog]);
 
   useEffect(() => {
     fetchLibraries();

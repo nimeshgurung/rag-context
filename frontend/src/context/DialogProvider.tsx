@@ -100,7 +100,15 @@ export const DialogProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   return (
-    <DialogContext.Provider value={{ showDialog, hideDialog, showConfirm, showSnackbar, hideSnackbar }}>
+    <DialogContext.Provider
+      value={{
+        showDialog,
+        hideDialog,
+        showConfirm,
+        showSnackbar,
+        hideSnackbar,
+      }}
+    >
       {children}
       <AlertDialog
         open={dialog.open}

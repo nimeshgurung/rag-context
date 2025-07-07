@@ -119,9 +119,7 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData }) => {
         type="number"
         value={maxDepth}
         onChange={(e) =>
-          setMaxDepth(
-            e.target.value === '' ? '' : parseInt(e.target.value, 10),
-          )
+          setMaxDepth(e.target.value === '' ? '' : parseInt(e.target.value, 10))
         }
         size="small"
       />

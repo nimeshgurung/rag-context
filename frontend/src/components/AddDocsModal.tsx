@@ -57,9 +57,7 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
       fullWidth
       maxWidth="md"
     >
-      <DialogTitle id="add-docs-modal-title">
-        Add New Documentation
-      </DialogTitle>
+      <DialogTitle id="add-docs-modal-title">Add New Documentation</DialogTitle>
       <DialogContent dividers>
         {isProcessing ? (
           <JobProgressDisplay progress={progress} />

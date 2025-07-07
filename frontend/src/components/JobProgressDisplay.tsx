@@ -1,15 +1,13 @@
 import React from 'react';
-import {
-  Box,
-  Typography,
-  CircularProgress,
-} from '@mui/material';
+import { Box, Typography, CircularProgress } from '@mui/material';
 
 interface JobProgressDisplayProps {
   progress: string[];
 }
 
-const JobProgressDisplay: React.FC<JobProgressDisplayProps> = ({ progress }) => {
+const JobProgressDisplay: React.FC<JobProgressDisplayProps> = ({
+  progress,
+}) => {
   return (
     <Box>
       <Typography variant="h6" component="h2">
