@@ -16,10 +16,15 @@ When users select "Code-focused" scraping in the web scrape form, they now have 
 ## Technical Implementation
 
 ### Database Changes
+The `custom_enrichment_prompt` column has been added to the `embedding_jobs` table in the main creation script:
+
 ```sql
--- Migration: scripts/add_custom_enrichment_prompt.sql
-ALTER TABLE embedding_jobs 
-ADD COLUMN IF NOT EXISTS custom_enrichment_prompt TEXT;
+-- In scripts/create_embedding_jobs_table.sql
+CREATE TABLE embedding_jobs (
+    -- ... other columns ...
+    custom_enrichment_prompt TEXT,
+    -- ... other columns ...
+);
 
 COMMENT ON COLUMN embedding_jobs.custom_enrichment_prompt IS 
   'Custom instructions to be used during the enrichment process for code snippets';
@@ -69,9 +74,10 @@ COMMENT ON COLUMN embedding_jobs.custom_enrichment_prompt IS
 
 ## Deployment Instructions
 
-1. **Database Migration**:
+1. **Database Setup**:
    ```bash
-   psql -U your_user -d your_database -f scripts/add_custom_enrichment_prompt.sql
+   # If creating the database for the first time:
+   psql -U your_user -d your_database -f scripts/create_embedding_jobs_table.sql
    ```
 
 2. **Backend**:

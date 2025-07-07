@@ -9,6 +9,7 @@ CREATE TABLE embedding_jobs (
     scrape_type TEXT,
     context_markdown TEXT,
     raw_snippets JSONB,
+    custom_enrichment_prompt TEXT,
     status VARCHAR(20) DEFAULT 'pending',
     attempts INTEGER DEFAULT 0,
     error_message TEXT,
@@ -22,3 +23,6 @@ CREATE TABLE embedding_jobs (
 CREATE INDEX idx_embedding_jobs_status ON embedding_jobs(status);
 -- Index for querying jobs by crawl id
 CREATE INDEX idx_embedding_jobs_job_id ON embedding_jobs(job_id);
+
+-- Add comment for documentation
+COMMENT ON COLUMN embedding_jobs.custom_enrichment_prompt IS 'Custom instructions to be used during the enrichment process for code snippets';
