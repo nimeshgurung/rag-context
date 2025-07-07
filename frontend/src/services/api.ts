@@ -100,6 +100,7 @@ export async function startCrawl(data: {
   libraryDescription: string;
   startUrl: string;
   scrapeType: 'code' | 'documentation';
+  customEnrichmentPrompt?: string;
 }): Promise<{ jobId: string }> {
   const response = await fetch(`${API_BASE_URL}/crawl/start`, {
     method: 'POST',

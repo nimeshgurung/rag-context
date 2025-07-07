@@ -29,6 +29,7 @@ const AddSourcePage = () => {
         libraryName,
         libraryDescription,
         startUrl,
+        scrapeType: 'documentation', // Default to documentation for simple form
       });
       navigate(`/jobs/${result.jobId}`);
     } catch (err: unknown) {

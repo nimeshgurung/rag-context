@@ -19,6 +19,7 @@ export async function startCrawlJob(
   libraryDescription: string,
   startUrl: string,
   scrapeType: 'code' | 'documentation',
+  customEnrichmentPrompt?: string,
 ) {
   const jobId = uuidv4();
   const libraryId = slug(libraryName);
@@ -57,6 +58,7 @@ export async function startCrawlJob(
       type: 'web-scrape',
       config: {
         scrapeType,
+        customEnrichmentPrompt,
       },
     };
 
@@ -167,6 +169,7 @@ export async function processSingleJob(jobItemId: number) {
         const enrichedData = await getEnrichedDataFromLLM(
           snippet,
           job.context_markdown,
+          job.custom_enrichment_prompt,
         );
         if (enrichedData) {
           enrichedItems.push(enrichedData);

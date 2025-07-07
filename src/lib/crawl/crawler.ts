@@ -121,6 +121,7 @@ async function crawlCode(
           ),
           contextMarkdown,
           scrapeType: 'code',
+          customEnrichmentPrompt: source.config.customEnrichmentPrompt,
         };
 
         if (job.rawSnippets.length > 0) {
