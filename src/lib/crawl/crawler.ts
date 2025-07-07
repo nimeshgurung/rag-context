@@ -1,4 +1,4 @@
-import { PlaywrightCrawler } from 'crawlee';
+import { PlaywrightCrawler, Configuration } from 'crawlee';
 import TurndownService from 'turndown';
 import { WebScrapeSource } from '../types';
 import { enqueueEmbeddingJobs, EmbeddingJobPayload } from '../jobs/storage';
@@ -39,108 +39,116 @@ async function crawlCode(
 
   const scopeGlob = getScopeGlob(startUrl);
 
-  const crawler = new PlaywrightCrawler({
-    maxRequestsPerCrawl: 1000,
-    maxConcurrency: 1,
-    async requestHandler({ request, page, enqueueLinks, log }) {
-      log.info(`[Job ${jobId}] Processing: ${request.url}`);
-      sendEvent(jobId, {
-        type: 'progress',
-        message: `Crawling: ${request.url}`,
-      });
-
-      // Execute pre-execution steps if provided
-      if (preExecutionSteps && preExecutionSteps.trim()) {
-        try {
-          log.info(
-            `[Job ${jobId}] Executing pre-execution steps for: ${request.url}`,
-          );
-          sendEvent(jobId, {
-            type: 'progress',
-            message: `Executing pre-steps for: ${request.url}`,
-          });
-
-          // Execute the pre-execution steps as JavaScript code
-          await page.evaluate(preExecutionSteps);
-
-          // Wait a bit for any dynamic content to load
-          await page.waitForTimeout(1000);
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error';
-          log.warning(
-            `[Job ${jobId}] Pre-execution steps failed for ${request.url}: ${errorMessage}`,
-          );
-          sendEvent(jobId, {
-            type: 'progress',
-            message: `Pre-execution steps failed for: ${request.url}`,
-          });
-        }
-      }
-
-      const mainContentHTML = await page.evaluate((selector) => {
-        const el = document.querySelector(selector);
-        return el ? el.innerHTML : document.body.innerHTML;
-      }, contentSelector || 'main, article, .main-content, #main-content');
-
-      if (!mainContentHTML) {
-        log.warning(`No main content found on ${request.url}. Skipping.`);
-        return;
-      }
-
-      const contextMarkdown = turndownService.turndown(mainContentHTML);
-
-      // Use codeSelector if provided, otherwise default to 'pre > code'
-      const codeSnippetSelector = codeSelector || 'pre > code';
-      const rawCodeSnippets = await page.evaluate((selector) => {
-        const snippets: string[] = [];
-        document.querySelectorAll(selector).forEach((codeElement) => {
-          snippets.push((codeElement as HTMLElement).textContent || '');
-        });
-        return snippets;
-      }, codeSnippetSelector);
-
-      if (rawCodeSnippets.length === 0) {
-        log.info(`No code snippets found on ${request.url}.`);
-        // Still create a job so we can track the page was crawled
-      }
-
-      const job: EmbeddingJobPayload = {
-        jobId,
-        libraryId,
-        libraryName: source.name,
-        libraryDescription,
-        sourceUrl: request.url,
-        rawSnippets: rawCodeSnippets.filter(
-          (snippet) => snippet?.trim() !== '',
-        ),
-        contextMarkdown,
-        scrapeType: 'code',
-      };
-
-      if (job.rawSnippets.length > 0) {
-        await enqueueEmbeddingJobs([job]);
-      } else {
-        log.info(`No snippets to enqueue for ${request.url}.`);
-      }
-
-      // Use default link selector since we removed linkSelector
-      await enqueueLinks({
-        selector: 'a',
-        globs: [scopeGlob],
-        strategy: 'same-hostname',
-      });
-    },
-    failedRequestHandler({ request, log }) {
-      log.error(
-        `[Job ${jobId}] Request ${request.url} failed and will not be retried.`,
-      );
-      sendEvent(jobId, {
-        type: 'progress',
-        message: `Failed to crawl: ${request.url}`,
-      });
-    },
+  const crawlerConfig = new Configuration({
+    persistStorage: false,
   });
+
+  const crawler = new PlaywrightCrawler(
+    {
+      maxRequestsPerCrawl: 1000,
+      maxConcurrency: 1,
+      async requestHandler({ request, page, enqueueLinks, log }) {
+        log.info(`[Job ${jobId}] Processing: ${request.url}`);
+        sendEvent(jobId, {
+          type: 'progress',
+          message: `Crawling: ${request.url}`,
+        });
+
+        // Execute pre-execution steps if provided
+        if (preExecutionSteps && preExecutionSteps.trim()) {
+          try {
+            log.info(
+              `[Job ${jobId}] Executing pre-execution steps for: ${request.url}`,
+            );
+            sendEvent(jobId, {
+              type: 'progress',
+              message: `Executing pre-steps for: ${request.url}`,
+            });
+
+            // Execute the pre-execution steps as JavaScript code
+            await page.evaluate(preExecutionSteps);
+
+            // Wait a bit for any dynamic content to load
+            await page.waitForTimeout(1000);
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : 'Unknown error';
+            log.warning(
+              `[Job ${jobId}] Pre-execution steps failed for ${request.url}: ${errorMessage}`,
+            );
+            sendEvent(jobId, {
+              type: 'progress',
+              message: `Pre-execution steps failed for: ${request.url}`,
+            });
+          }
+        }
+
+        const mainContentHTML = await page.evaluate((selector) => {
+          const el = document.querySelector(selector);
+          return el ? el.innerHTML : document.body.innerHTML;
+        }, contentSelector || 'main, article, .main-content, #main-content');
+
+        if (!mainContentHTML) {
+          log.warning(`No main content found on ${request.url}. Skipping.`);
+          return;
+        }
+
+        const contextMarkdown = turndownService.turndown(mainContentHTML);
+
+        // Use codeSelector if provided, otherwise default to 'pre > code'
+        const codeSnippetSelector = codeSelector || 'pre > code';
+        const rawCodeSnippets = await page.evaluate((selector) => {
+          const snippets: string[] = [];
+          document.querySelectorAll(selector).forEach((codeElement) => {
+            snippets.push((codeElement as HTMLElement).textContent || '');
+          });
+          return snippets;
+        }, codeSnippetSelector);
+
+        if (rawCodeSnippets.length === 0) {
+          log.info(`No code snippets found on ${request.url}.`);
+          // Still create a job so we can track the page was crawled
+        }
+
+        const job: EmbeddingJobPayload = {
+          jobId,
+          libraryId,
+          libraryName: source.name,
+          libraryDescription,
+          sourceUrl: request.url,
+          rawSnippets: rawCodeSnippets.filter(
+            (snippet) => snippet?.trim() !== '',
+          ),
+          contextMarkdown,
+          scrapeType: 'code',
+        };
+
+        if (job.rawSnippets.length > 0) {
+          await enqueueEmbeddingJobs([job]);
+        } else {
+          log.info(`No snippets to enqueue for ${request.url}.`);
+        }
+
+        // Use default link selector since we removed linkSelector
+        await enqueueLinks({
+          selector: 'a',
+          globs: [scopeGlob],
+          strategy: 'same-hostname',
+        });
+      },
+      failedRequestHandler({ request, log }, error) {
+        log.error(
+          `[Job ${jobId}] Request ${request.url} failed and will not be retried.`,
+          { error },
+        );
+        sendEvent(jobId, {
+          type: 'progress',
+          message: `Failed to crawl: ${request.url}. Reason: ${error.message}`,
+        });
+      },
+    },
+    crawlerConfig,
+  );
 
   console.log(
     `[Job ${jobId}] Starting crawl for ${libraryId} at ${startUrl}...`,

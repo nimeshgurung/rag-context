@@ -12,9 +12,10 @@ CREATE TABLE embedding_jobs (
     status VARCHAR(20) DEFAULT 'pending',
     attempts INTEGER DEFAULT 0,
     error_message TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    processed_at TIMESTAMPTZ
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(source_url, library_id)
 );
 
 -- Index for faster querying of pending jobs
