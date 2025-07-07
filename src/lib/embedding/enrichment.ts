@@ -6,13 +6,15 @@ import { EnrichedItem } from '../types';
  * Enriches a code snippet with a title and description using an LLM.
  * @param {string} code - The clean code snippet.
  * @param {string} contextMarkdown - The surrounding documentation context in Markdown.
+ * @param {string} customInstructions - Optional custom instructions to append to the system prompt.
  * @returns {Promise<object>} A promise that resolves to the enriched data object.
  */
 export async function getEnrichedDataFromLLM(
   code: string,
   contextMarkdown: string,
+  customInstructions?: string,
 ): Promise<EnrichedItem> {
-  const systemPrompt = `You are an expert programmer and technical writer.
+  let systemPrompt = `You are an expert programmer and technical writer.
 Your task is to generate a concise, informative title and a brief description for a given code snippet.
 You will be provided with the code snippet and the surrounding markdown content from the documentation page where it was found.
 
@@ -29,6 +31,11 @@ You will be provided with the code snippet and the surrounding markdown content 
       "language": "The programming language you identified",
       "formattedCode": "Formatted code snippet with correct indentation and return it."
     }`;
+
+  // Append custom instructions if provided
+  if (customInstructions) {
+    systemPrompt += `\n\n**Additional Instructions:**\n${customInstructions}`;
+  }
 
   const prompt = `**Context from Documentation Page:**
 ---

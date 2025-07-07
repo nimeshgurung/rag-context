@@ -14,6 +14,7 @@ interface StartCrawlRequestBody {
   libraryName: string;
   libraryDescription?: string;
   scrapeType: 'code' | 'documentation';
+  customEnrichmentPrompt?: string;
 }
 
 // Start a crawl job
@@ -25,6 +26,7 @@ router.post(
       req.body.libraryDescription || '',
       req.body.startUrl,
       req.body.scrapeType,
+      req.body.customEnrichmentPrompt,
     )
       .then((jobId) => {
         res.status(202).json({ jobId });

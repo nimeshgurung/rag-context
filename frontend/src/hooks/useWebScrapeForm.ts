@@ -9,6 +9,7 @@ export interface WebScrapeFormState {
   preExecutionSteps: string;
   maxDepth: number | '';
   scrapeType: 'code' | 'documentation';
+  customEnrichmentPrompt: string;
 }
 
 export interface WebScrapeFormActions {
@@ -20,6 +21,7 @@ export interface WebScrapeFormActions {
   setPreExecutionSteps: (steps: string) => void;
   setMaxDepth: (depth: number | '') => void;
   setScrapeType: (type: 'code' | 'documentation') => void;
+  setCustomEnrichmentPrompt: (prompt: string) => void;
   reset: () => void;
   validate: () => boolean;
 }
@@ -33,6 +35,7 @@ const initialState: WebScrapeFormState = {
   preExecutionSteps: '',
   maxDepth: '',
   scrapeType: 'code',
+  customEnrichmentPrompt: '',
 };
 
 export const useWebScrapeForm = () => {
@@ -70,6 +73,10 @@ export const useWebScrapeForm = () => {
     setState((prev: WebScrapeFormState) => ({ ...prev, scrapeType }));
   };
 
+  const setCustomEnrichmentPrompt = (customEnrichmentPrompt: string) => {
+    setState((prev: WebScrapeFormState) => ({ ...prev, customEnrichmentPrompt }));
+  };
+
   const reset = () => {
     setState(initialState);
   };
@@ -88,6 +95,7 @@ export const useWebScrapeForm = () => {
     setPreExecutionSteps,
     setMaxDepth,
     setScrapeType,
+    setCustomEnrichmentPrompt,
     reset,
     validate,
   };

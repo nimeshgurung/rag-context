@@ -26,6 +26,7 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData, hideLibraryFiel
     preExecutionSteps,
     maxDepth,
     scrapeType,
+    customEnrichmentPrompt,
     setLibraryName,
     setDescription,
     setStartUrl,
@@ -34,6 +35,7 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData, hideLibraryFiel
     setPreExecutionSteps,
     setMaxDepth,
     setScrapeType,
+    setCustomEnrichmentPrompt,
   } = formData;
 
   return (
@@ -129,6 +131,17 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData, hideLibraryFiel
         }
         size="small"
       />
+      {scrapeType === 'code' && (
+        <TextField
+          label="Custom Enrichment Instructions"
+          value={customEnrichmentPrompt}
+          onChange={(e) => setCustomEnrichmentPrompt(e.target.value)}
+          helperText="Additional instructions for synthesizing code snippets (e.g., 'Focus on React hooks', 'Include TypeScript types')"
+          multiline
+          rows={3}
+          size="small"
+        />
+      )}
     </Box>
   );
 };

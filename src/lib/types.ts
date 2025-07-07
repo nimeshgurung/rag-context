@@ -54,6 +54,7 @@ export type WebScrapeSource = {
     codeSelector?: string;
     maxDepth?: number;
     preExecutionSteps?: string;
+    customEnrichmentPrompt?: string;
   };
 };
 

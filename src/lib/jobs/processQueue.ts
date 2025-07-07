@@ -6,7 +6,7 @@ import {
 } from './storage';
 import { getEnrichedDataFromLLM } from '../embedding/enrichment';
 import { EnrichedItem } from '../types';
-import { saveEnrichedData } from '../embedding/saveEnrichedData';
+import { saveEnrichedCodeSnippets } from '../embedding/saveEnrichedData';
 
 const RATE_LIMIT_PER_MINUTE = process.env.EMBEDDING_RATE_LIMIT
   ? parseInt(process.env.EMBEDDING_RATE_LIMIT, 10)
@@ -50,17 +50,18 @@ export async function processQueue(jobId?: string) {
 
           const enrichedItems: EnrichedItem[] = [];
           for (const snippet of job.rawSnippets) {
-            const enrichedData = await getEnrichedDataFromLLM(
-              snippet,
-              job.contextMarkdown,
-            );
+                            const enrichedData = await getEnrichedDataFromLLM(
+          snippet,
+          job.contextMarkdown || '',
+          job.customEnrichmentPrompt,
+        );
             if (enrichedData) {
               enrichedItems.push(enrichedData);
             }
           }
 
           if (enrichedItems.length > 0) {
-            await saveEnrichedData(
+            await saveEnrichedCodeSnippets(
               enrichedItems,
               {
                 libraryId: job.libraryId,

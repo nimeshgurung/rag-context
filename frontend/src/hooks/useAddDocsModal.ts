@@ -168,6 +168,7 @@ export const useAddDocsModal = (
           preExecutionSteps: formData.preExecutionSteps || undefined,
           maxDepth:
             formData.maxDepth === '' ? undefined : Number(formData.maxDepth),
+          customEnrichmentPrompt: formData.customEnrichmentPrompt || undefined,
         },
       };
 
