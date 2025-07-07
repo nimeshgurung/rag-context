@@ -21,9 +21,17 @@ import { useWebScrapeForm } from '../hooks/useWebScrapeForm';
 interface AddDocsModalProps {
   open: boolean;
   onClose: () => void;
+  existingLibrary?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
-const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
+const AddDocsModal: React.FC<AddDocsModalProps> = ({
+  open,
+  onClose,
+  existingLibrary
+}) => {
   const {
     activeTab,
     handleTabChange,
@@ -31,7 +39,7 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
     handleWebScrapeSubmit,
     isProcessing,
     progress,
-  } = useAddDocsModal(open, onClose);
+  } = useAddDocsModal(open, onClose, existingLibrary);
   const apiSpecFormData = useApiSpecForm();
   const webScrapeFormData = useWebScrapeForm();
 
@@ -49,6 +57,10 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
     }
   };
 
+  const modalTitle = existingLibrary
+    ? `Add Resource to ${existingLibrary.name}`
+    : 'Add New Documentation';
+
   return (
     <Dialog
       open={open}
@@ -57,7 +69,7 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
       fullWidth
       maxWidth="md"
     >
-      <DialogTitle id="add-docs-modal-title">Add New Documentation</DialogTitle>
+      <DialogTitle id="add-docs-modal-title">{modalTitle}</DialogTitle>
       <DialogContent dividers>
         {isProcessing ? (
           <JobProgressDisplay progress={progress} />
@@ -75,11 +87,17 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({ open, onClose }) => {
             </Box>
 
             <TabPanel value={activeTab} index={0}>
-              <ApiSpecForm formData={apiSpecFormData} />
+              <ApiSpecForm
+                formData={apiSpecFormData}
+                hideLibraryFields={!!existingLibrary}
+              />
             </TabPanel>
 
             <TabPanel value={activeTab} index={1}>
-              <WebScrapeForm formData={webScrapeFormData} />
+              <WebScrapeForm
+                formData={webScrapeFormData}
+                hideLibraryFields={!!existingLibrary}
+              />
             </TabPanel>
           </>
         )}

@@ -3,6 +3,7 @@ import {
   searchLibraries,
   getUniqueLibraries,
   getLatestJobForLibrary,
+  getAllJobsForLibrary,
   deleteLibrary,
 } from '../lib/api';
 import { DocumentationSource } from '../lib/types';
@@ -89,6 +90,25 @@ router.get(
         `Failed to get latest job for library ${libraryId}:`,
         error,
       );
+      res.status(500).json({
+        success: false,
+        message:
+          error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    }
+  },
+);
+
+// Get all jobs for a library
+router.get(
+  '/:libraryId/jobs',
+  async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
+    const { libraryId } = req.params;
+    try {
+      const result = await getAllJobsForLibrary(libraryId);
+      res.json(result);
+    } catch (error) {
+      console.error(`Failed to get jobs for library ${libraryId}:`, error);
       res.status(500).json({
         success: false,
         message:

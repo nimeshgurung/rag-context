@@ -194,3 +194,35 @@ export async function addLibraryResource(
 
   return response.json();
 }
+
+export async function getAllJobsForLibrary(libraryId: string): Promise<{
+  totalJobs: number;
+  batches: Array<{
+    jobId: string;
+    createdAt: string;
+    summary: {
+      total: number;
+      pending: number;
+      processing: number;
+      completed: number;
+      failed: number;
+    };
+    jobs: Array<{
+      id: number;
+      sourceUrl: string;
+      status: string;
+      processedAt: string | null;
+      errorMessage: string | null;
+      scrapeType: string;
+    }>;
+  }>;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/libraries/${libraryId}/jobs`,
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to get jobs for library');
+  }
+  return response.json();
+}
