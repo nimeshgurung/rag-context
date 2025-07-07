@@ -14,13 +14,14 @@ import {
   Button,
   CircularProgress,
 } from '@mui/material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 import {
   getLibraries,
-  getLatestJobForLibrary,
   deleteLibrary,
 } from '../services/api';
 import { useDialog } from '../context/DialogProvider';
+import AddDocsModal from '../components/AddDocsModal';
+import LibraryJobsModal from '../components/LibraryJobsModal';
 
 interface Library {
   libraryId: string;
@@ -33,9 +34,10 @@ const HomePage: React.FC = () => {
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [checkingJobId, setCheckingJobId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const navigate = useNavigate();
+  const [addDocsModalOpen, setAddDocsModalOpen] = useState(false);
+  const [jobsModalOpen, setJobsModalOpen] = useState(false);
+  const [selectedLibrary, setSelectedLibrary] = useState<{ id: string; name: string } | null>(null);
   const { showDialog, showConfirm } = useDialog();
 
   const fetchLibraries = useCallback(async () => {
@@ -66,21 +68,9 @@ const HomePage: React.FC = () => {
     };
   }, [fetchLibraries]);
 
-  const handleViewLastJob = async (libraryId: string) => {
-    setCheckingJobId(libraryId);
-    try {
-      const { jobId } = await getLatestJobForLibrary(libraryId);
-      if (jobId) {
-        navigate(`/jobs/${jobId}`);
-      } else {
-        showDialog('No Job Found', 'No job found for this library.');
-      }
-    } catch (error) {
-      console.error('Failed to get latest job', error);
-      showDialog('Error', 'Could not retrieve job information.');
-    } finally {
-      setCheckingJobId(null);
-    }
+  const handleViewJobs = (libraryId: string, libraryName: string) => {
+    setSelectedLibrary({ id: libraryId, name: libraryName });
+    setJobsModalOpen(true);
   };
 
   const handleDeleteLibrary = async (
@@ -103,6 +93,18 @@ const HomePage: React.FC = () => {
         }
       },
     );
+  };
+
+  const handleAddResource = (libraryId: string, libraryName: string) => {
+    setSelectedLibrary({ id: libraryId, name: libraryName });
+    setAddDocsModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setAddDocsModalOpen(false);
+    setSelectedLibrary(null);
+    // Refresh libraries in case a resource was added
+    fetchLibraries();
   };
 
   const filteredLibraries = libraries.filter(
@@ -164,14 +166,18 @@ const HomePage: React.FC = () => {
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => handleViewLastJob(row.libraryId)}
-                      disabled={checkingJobId === row.libraryId}
+                      onClick={() => handleViewJobs(row.libraryId, row.name)}
                     >
-                      {checkingJobId === row.libraryId ? (
-                        <CircularProgress size={20} />
-                      ) : (
-                        'View Jobs'
-                      )}
+                      View Jobs
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="primary"
+                      onClick={() => handleAddResource(row.libraryId, row.name)}
+                      sx={{ ml: 1 }}
+                    >
+                      Add Resource
                     </Button>
                     <Button
                       variant="outlined"
@@ -196,6 +202,24 @@ const HomePage: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
+
+      <AddDocsModal
+        open={addDocsModalOpen}
+        onClose={handleModalClose}
+        existingLibrary={selectedLibrary}
+      />
+
+      {selectedLibrary && (
+        <LibraryJobsModal
+          open={jobsModalOpen}
+          onClose={() => {
+            setJobsModalOpen(false);
+            setSelectedLibrary(null);
+          }}
+          libraryId={selectedLibrary.id}
+          libraryName={selectedLibrary.name}
+        />
+      )}
     </Box>
   );
 };

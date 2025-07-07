@@ -14,9 +14,10 @@ import { useApiSpecForm } from '../../hooks/useApiSpecForm';
 
 interface ApiSpecFormProps {
   formData: ReturnType<typeof useApiSpecForm>;
+  hideLibraryFields?: boolean;
 }
 
-const ApiSpecForm: React.FC<ApiSpecFormProps> = ({ formData }) => {
+const ApiSpecForm: React.FC<ApiSpecFormProps> = ({ formData, hideLibraryFields = false }) => {
   const {
     libraryName,
     description,
@@ -43,22 +44,48 @@ const ApiSpecForm: React.FC<ApiSpecFormProps> = ({ formData }) => {
       autoComplete="off"
       sx={{ '& .MuiTextField-root': { m: 1, width: '95%' } }}
     >
-      <TextField
-        required
-        label="Library Name"
-        value={libraryName}
-        onChange={(e) => setLibraryName(e.target.value)}
-        size="small"
-      />
-      <TextField
-        required
-        label="Description"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        multiline
-        rows={2}
-        size="small"
-      />
+      {!hideLibraryFields && (
+        <>
+          <TextField
+            required
+            label="Library Name"
+            value={libraryName}
+            onChange={(e) => setLibraryName(e.target.value)}
+            size="small"
+          />
+          <TextField
+            required
+            label="Description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            multiline
+            rows={2}
+            size="small"
+          />
+        </>
+      )}
+
+      {hideLibraryFields && (
+        <>
+          <TextField
+            label="Spec Name (Optional)"
+            value={libraryName}
+            onChange={(e) => setLibraryName(e.target.value)}
+            size="small"
+            helperText="Give this API spec a name for identification"
+          />
+          <TextField
+            label="Spec Description (Optional)"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            multiline
+            rows={2}
+            size="small"
+            helperText="Brief description of what this API spec covers"
+          />
+        </>
+      )}
+
       <FormControl component="fieldset" sx={{ m: 1 }}>
         <FormLabel component="legend">Source</FormLabel>
         <RadioGroup

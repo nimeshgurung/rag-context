@@ -248,3 +248,84 @@ export async function getLatestJobForLibrary(libraryId: string) {
 
   return { jobId: rows[0].job_id };
 }
+
+interface JobBatch {
+  jobId: string;
+  createdAt: Date;
+  jobs: {
+    id: number;
+    sourceUrl: string;
+    status: string;
+    processedAt: Date | null;
+    errorMessage: string | null;
+    scrapeType: string;
+  }[];
+  summary?: {
+    total: number;
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+  };
+}
+
+export async function getAllJobsForLibrary(libraryId: string) {
+  const { rows } = await pool.query(
+    `SELECT
+      id,
+      job_id,
+      source_url,
+      status,
+      created_at,
+      processed_at,
+      error_message,
+      scrape_type
+    FROM embedding_jobs
+    WHERE library_id = $1
+    ORDER BY created_at DESC`,
+    [libraryId],
+  );
+
+  // Group jobs by job_id to show batches
+  const jobBatches = rows.reduce(
+    (acc, job) => {
+      if (!acc[job.job_id]) {
+        acc[job.job_id] = {
+          jobId: job.job_id,
+          createdAt: job.created_at,
+          jobs: [],
+        };
+      }
+      acc[job.job_id].jobs.push({
+        id: job.id,
+        sourceUrl: job.source_url,
+        status: job.status,
+        processedAt: job.processed_at,
+        errorMessage: job.error_message,
+        scrapeType: job.scrape_type,
+      });
+      return acc;
+    },
+    {} as Record<string, JobBatch>,
+  );
+
+  // Convert to array and calculate summaries
+  const batches = (Object.values(jobBatches) as JobBatch[]).map((batch) => {
+    const summary = {
+      total: batch.jobs.length,
+      pending: batch.jobs.filter((j) => j.status === 'pending').length,
+      processing: batch.jobs.filter((j) => j.status === 'processing').length,
+      completed: batch.jobs.filter((j) => j.status === 'completed').length,
+      failed: batch.jobs.filter((j) => j.status === 'failed').length,
+    };
+    return {
+      ...batch,
+      summary,
+    };
+  });
+
+  return {
+    totalJobs: rows.length,
+    batches,
+  };
+}

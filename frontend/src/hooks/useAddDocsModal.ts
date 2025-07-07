@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as React from 'react';
-import { addDocumentationSource } from '../services/api';
+import { addDocumentationSource, addLibraryResource } from '../services/api';
 import { useDialog } from '../context/DialogProvider';
 import { useJobProgress } from './useJobProgress';
 import { useApiSpecForm } from './useApiSpecForm';
@@ -8,7 +8,16 @@ import { useWebScrapeForm } from './useWebScrapeForm';
 import type { ApiSpecSource, WebScrapeSource } from '../../../src/lib/types';
 import usePrevious from 'use-previous';
 
-export const useAddDocsModal = (open: boolean, onClose: () => void) => {
+interface ExistingLibrary {
+  id: string;
+  name: string;
+}
+
+export const useAddDocsModal = (
+  open: boolean,
+  onClose: () => void,
+  existingLibrary?: ExistingLibrary | null
+) => {
   const [activeTab, setActiveTab] = useState(0);
   const { showDialog } = useDialog();
   const {
@@ -49,7 +58,8 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
 
   const handleApiSpecSubmit = useCallback(
     async (formData: ReturnType<typeof useApiSpecForm>) => {
-      if (!formData.validate()) {
+      // When adding to existing library, we don't need library name/description
+      if (!existingLibrary && !formData.validate()) {
         showDialog(
           'Missing Information',
           'Library Name and Description are required.',
@@ -69,16 +79,24 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
 
         const source: ApiSpecSource = {
           type: 'api-spec',
-          name: formData.libraryName,
-          description: formData.description,
+          name: existingLibrary ? formData.libraryName || `${existingLibrary.name} API Spec` : formData.libraryName,
+          description: existingLibrary
+            ? formData.description || `API specification for ${existingLibrary.name}`
+            : formData.description,
           sourceType: formData.uploadType,
           content,
         };
 
         setProcessing(true);
-        addProgress('Submitting API specification...');
+        addProgress(existingLibrary
+          ? `Adding API specification to ${existingLibrary.name}...`
+          : 'Submitting API specification...'
+        );
 
-        const res = await addDocumentationSource(source);
+        const res = existingLibrary
+          ? await addLibraryResource(existingLibrary.id, source)
+          : await addDocumentationSource(source);
+
         if (res.jobId) {
           addProgress('Processing started. Listening for updates...');
           startListening(
@@ -113,12 +131,13 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
         setTimeout(() => onClose(), 3000);
       }
     },
-    [setProcessing, addProgress, startListening, showDialog, onClose],
+    [setProcessing, addProgress, startListening, showDialog, onClose, existingLibrary],
   );
 
   const handleWebScrapeSubmit = useCallback(
     async (formData: ReturnType<typeof useWebScrapeForm>) => {
-      if (!formData.validate()) {
+      // When adding to existing library, we don't need library name/description
+      if (!existingLibrary && !formData.validate()) {
         showDialog(
           'Missing Information',
           'Library Name, Description, and Start URL are required.',
@@ -126,10 +145,21 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
         return;
       }
 
+      // For existing library, we still need the URL
+      if (!formData.startUrl) {
+        showDialog(
+          'Missing Information',
+          'Start URL is required.',
+        );
+        return;
+      }
+
       const source: WebScrapeSource = {
         type: 'web-scrape',
-        name: formData.libraryName,
-        description: formData.description,
+        name: existingLibrary ? existingLibrary.name : formData.libraryName,
+        description: existingLibrary
+          ? `Additional resource for ${existingLibrary.name}`
+          : formData.description,
         startUrl: formData.startUrl,
         config: {
           scrapeType: formData.scrapeType,
@@ -144,9 +174,15 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
 
       try {
         setProcessing(true);
-        addProgress('Submitting web scrape job...');
+        addProgress(existingLibrary
+          ? `Adding web resource to ${existingLibrary.name}...`
+          : 'Submitting web scrape job...'
+        );
 
-        const res = await addDocumentationSource(source);
+        const res = existingLibrary
+          ? await addLibraryResource(existingLibrary.id, source)
+          : await addDocumentationSource(source);
+
         if (res.jobId) {
           addProgress('Processing started. Listening for updates...');
           startListening(
@@ -180,7 +216,7 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
         setTimeout(() => onClose(), 3000);
       }
     },
-    [setProcessing, addProgress, startListening, showDialog, onClose],
+    [setProcessing, addProgress, startListening, showDialog, onClose, existingLibrary],
   );
 
   return {
@@ -191,5 +227,6 @@ export const useAddDocsModal = (open: boolean, onClose: () => void) => {
     getApiSpecContent,
     isProcessing,
     progress,
+    existingLibrary,
   };
 };

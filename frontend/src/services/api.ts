@@ -176,3 +176,54 @@ export async function deleteLibrary(
   }
   return response.json();
 }
+
+export async function addLibraryResource(
+  libraryId: string,
+  source: DocumentationSource,
+): Promise<{ jobId: string }> {
+  const response = await fetch(`${API_BASE_URL}/libraries/${encodeURIComponent(libraryId)}/add-resource`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(source),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to add resource to library');
+  }
+
+  return response.json();
+}
+
+export async function getAllJobsForLibrary(libraryId: string): Promise<{
+  totalJobs: number;
+  batches: Array<{
+    jobId: string;
+    createdAt: string;
+    summary: {
+      total: number;
+      pending: number;
+      processing: number;
+      completed: number;
+      failed: number;
+    };
+    jobs: Array<{
+      id: number;
+      sourceUrl: string;
+      status: string;
+      processedAt: string | null;
+      errorMessage: string | null;
+      scrapeType: string;
+    }>;
+  }>;
+}> {
+  const response = await fetch(
+    `${API_BASE_URL}/libraries/${libraryId}/jobs`,
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to get jobs for library');
+  }
+  return response.json();
+}

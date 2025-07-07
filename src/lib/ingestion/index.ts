@@ -6,14 +6,15 @@ import { handleWebScrapeSource } from './webScrape';
 export async function addDocumentationSource(
   jobId: string,
   source: DocumentationSource,
+  existingLibraryId?: string,
 ) {
   try {
     switch (source.type) {
       case 'api-spec':
-        await handleApiSpecSource(jobId, source);
+        await handleApiSpecSource(jobId, source, existingLibraryId);
         break;
       case 'web-scrape':
-        await handleWebScrapeSource(jobId, source);
+        await handleWebScrapeSource(jobId, source, existingLibraryId);
         break;
       default:
         throw new Error('Unknown documentation source type');
