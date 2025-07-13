@@ -51,6 +51,54 @@ interface JobBatch {
  *
  * Handles job creation, processing, status tracking, and queue management
  * with rate limiting and batch processing capabilities.
+ *
+ * IMPORTANT: Understanding the Two Types of IDs
+ * ============================================
+ *
+ * This service works with TWO different types of IDs that are often confused:
+ *
+ * 1. Database Row ID (integer): Auto-increment primary key (1, 2, 3, 4...)
+ *    - Used by: processSingleJob(jobItemId: number)
+ *    - Identifies: ONE specific URL in the embedding_jobs table
+ *    - Example: processSingleJob(3) processes just the URL in row 3
+ *
+ * 2. Crawl Batch ID (UUID string): Groups URLs from the same crawl operation
+ *    - Used by: processAllJobs(jobId: string), getCrawlJobStatus(jobId: string)
+ *    - Identifies: ALL URLs discovered in a single crawl operation
+ *    - Example: processAllJobs("abc-123-def-456") processes all URLs from that crawl
+ *
+ * Database Schema:
+ * ---------------
+ * embedding_jobs (
+ *     id SERIAL PRIMARY KEY,           -- Row ID (integer)
+ *     job_id UUID NOT NULL,           -- Crawl Batch ID (UUID string)
+ *     source_url TEXT NOT NULL,       -- Individual URL
+ *     library_id TEXT NOT NULL,       -- Library this belongs to
+ *     raw_snippets JSONB,            -- Pre-scraped content chunks
+ *     status VARCHAR(20)              -- pending/processing/completed/failed
+ * )
+ *
+ * Example Data:
+ * ------------
+ * id | job_id                    | source_url              | status
+ * 1  | abc-123-def-456          | https://docs.com/page1  | pending
+ * 2  | abc-123-def-456          | https://docs.com/page2  | completed
+ * 3  | abc-123-def-456          | https://docs.com/page3  | failed
+ * 4  | xyz-789-ghi-012          | https://other.com/api   | pending
+ *
+ * Method Usage Examples:
+ * ---------------------
+ * - processSingleJob(3)                 → Process just "https://docs.com/page3"
+ * - processAllJobs("abc-123-def-456")   → Process all URLs from that crawl batch
+ * - getCrawlJobStatus("abc-123-def-456") → Get status of all URLs in that batch
+ *
+ * Processing Flow:
+ * ---------------
+ * 1. User starts crawl → Creates crawl batch ID (UUID)
+ * 2. Crawler discovers URLs → Creates embedding_jobs rows with same job_id
+ * 3. Each row contains pre-scraped content (rawSnippets) from crawl phase
+ * 4. Processing phase → Converts rawSnippets to embeddings and stores in vector DB
+ * 5. No re-crawling occurs during processing - works with existing content
  */
 class JobService {
   private queue: PQueue;
@@ -116,7 +164,15 @@ class JobService {
   }
 
   /**
-   * Fetch pending jobs from the database with optional filtering by jobId.
+   * Fetch pending embedding jobs from the database with optional filtering by crawl batch ID.
+   *
+   * @param limit - Maximum number of jobs to fetch
+   * @param jobId - Optional crawl batch ID (UUID string) to filter by. If provided,
+   *                only fetches pending jobs from that specific crawl batch.
+   * @returns Promise with array of pending jobs, automatically marked as 'processing'
+   *
+   * Example: fetchPendingJobs(10, "abc-123-def-456") gets up to 10 pending jobs
+   *          from that specific crawl batch
    */
   private async fetchPendingJobs(
     limit: number,
@@ -268,7 +324,14 @@ class JobService {
   }
 
   /**
-   * Get the status of a crawl job.
+   * Get the status of all embedding jobs in a crawl batch.
+   *
+   * @param jobId - Crawl batch ID (UUID string) from embedding_jobs.job_id
+   *                Returns status for ALL URLs discovered in that crawl operation.
+   * @returns Promise with summary statistics and individual job details
+   *
+   * Example: getCrawlJobStatus("abc-123-def-456") returns status for all URLs
+   *          in that crawl batch with counts of pending/processing/completed/failed
    */
   async getCrawlJobStatus(jobId: string) {
     const { rows } = await pool.query<JobStatusRow>(
@@ -297,7 +360,13 @@ class JobService {
   }
 
   /**
-   * Delete a job and its associated embeddings.
+   * Delete a single embedding job and its associated embeddings by database row ID.
+   *
+   * @param jobItemId - Database row ID (integer) from embedding_jobs.id
+   *                    NOT the crawl batch UUID! This deletes ONE specific URL.
+   * @returns Promise with success status
+   *
+   * Example: deleteJob(3) deletes just the URL in database row 3 and its embeddings
    */
   async deleteJob(jobItemId: number) {
     const client = await pool.connect();
@@ -339,7 +408,13 @@ class JobService {
   }
 
   /**
-   * Process a single job by ID.
+   * Process a single embedding job by its database row ID.
+   *
+   * @param jobItemId - Database row ID (integer) from embedding_jobs.id
+   *                    NOT the crawl batch UUID! This processes ONE specific URL.
+   * @returns Promise with success status and message
+   *
+   * Example: processSingleJob(3) processes just the URL in database row 3
    */
   async processSingleJob(jobItemId: number) {
     const { rows } = await pool.query(
@@ -386,7 +461,14 @@ class JobService {
   }
 
   /**
-   * Start processing all jobs for a given jobId in the background.
+   * Start processing all embedding jobs for a given crawl batch in the background.
+   *
+   * @param jobId - Crawl batch ID (UUID string) from embedding_jobs.job_id
+   *                This processes ALL URLs discovered in a single crawl operation.
+   * @returns Promise with success status and message about worker process
+   *
+   * Example: processAllJobs("abc-123-def-456") processes all pending URLs
+   *          from that crawl batch by spawning a background worker process
    */
   async processAllJobs(jobId: string) {
     try {
@@ -441,7 +523,18 @@ class JobService {
   }
 
   /**
-   * Get all jobs for a library with summary.
+   * Get all embedding jobs for a library, grouped by crawl batch with summary statistics.
+   *
+   * @param libraryId - Library ID to fetch jobs for
+   * @returns Promise with array of JobBatch objects, each representing one crawl operation
+   *          containing all URLs discovered in that crawl plus summary statistics
+   *
+   * Each JobBatch contains:
+   * - jobId: The crawl batch ID (UUID string)
+   * - jobs: Array of individual URL jobs with their database row IDs and status
+   * - summary: Counts of pending/processing/completed/failed jobs in this batch
+   *
+   * Example: getAllJobsForLibrary("react-docs") returns all crawl batches for that library
    */
   async getAllJobsForLibrary(libraryId: string): Promise<JobBatch[]> {
     const { rows } = await pool.query(
@@ -489,6 +582,16 @@ class JobService {
 
   /**
    * Process the job queue with rate limiting and batch processing.
+   *
+   * @param jobId - Optional crawl batch ID (UUID string) to scope processing to.
+   *                If provided, only processes jobs from that specific crawl batch.
+   *                If omitted, processes jobs from all crawl batches.
+   *
+   * This method runs in a continuous loop, fetching and processing jobs until:
+   * - No more pending jobs exist (if jobId provided, exits)
+   * - Process is manually stopped (if no jobId, runs indefinitely)
+   *
+   * Example: processQueue("abc-123-def-456") processes only jobs from that crawl batch
    */
   async processQueue(jobId?: string): Promise<void> {
     console.log('Starting embedding worker...');
