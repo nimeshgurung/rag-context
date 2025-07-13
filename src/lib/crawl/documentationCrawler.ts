@@ -2,33 +2,14 @@ import { PlaywrightCrawler, Configuration } from 'crawlee';
 import TurndownService from 'turndown';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
+import { MDocument } from '@mastra/rag';
 import { WebScrapeSource } from '../types';
-import { enqueueEmbeddingJobs, EmbeddingJobPayload } from '../jobs/storage';
+import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
-import { MarkdownHeaderTextSplitter } from '../splitters/markdownHeaderTextSplitter';
+import { EmbeddingJobPayload } from '../jobs/jobService';
+import { getScopeGlob } from './utils';
 
-const turndownService = new TurndownService({
-  headingStyle: 'atx',
-  codeBlockStyle: 'fenced',
-});
-
-function getScopeGlob(url: string): string {
-  const urlObject = new URL(url);
-
-  let path;
-  if (urlObject.hash && urlObject.hash.length > 1) {
-    let hashPath = urlObject.hash.substring(1);
-    if (!hashPath.startsWith('/')) {
-      hashPath = `/${hashPath}`;
-    }
-    path = hashPath;
-  } else {
-    path = urlObject.pathname;
-  }
-
-  const finalPath = path === '/' ? '' : path;
-  return `${urlObject.origin}${finalPath}/**`;
-}
+const turndownService = new TurndownService();
 
 export async function crawlDocumentation(
   jobId: string,
@@ -66,20 +47,20 @@ export async function crawlDocumentation(
         }
         const markdown = turndownService.turndown(article.content);
 
-        const splitter = new MarkdownHeaderTextSplitter(
-          [
+        const doc = MDocument.fromMarkdown(markdown);
+        const chunks = await doc.chunk({
+          strategy: 'markdown',
+          headers: [
             ['#', 'h1'],
             ['##', 'h2'],
             ['###', 'h3'],
-            ['####', 'h4'],
-            ['#####', 'h5'],
-            ['######', 'h6'],
           ],
-          false,
-          false,
-        );
-
-        const chunks = await splitter.splitText(markdown);
+          extract: {
+            title: true,
+            summary: true,
+          },
+          overlap: 50,
+        });
 
         const job: EmbeddingJobPayload = {
           jobId,
@@ -87,7 +68,7 @@ export async function crawlDocumentation(
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          rawSnippets: chunks.map((chunk) => chunk.pageContent).filter(Boolean),
+          rawSnippets: chunks.map((chunk) => chunk.text).filter(Boolean),
           scrapeType: 'documentation',
         };
 

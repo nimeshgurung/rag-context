@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { processQueue } from './processQueue';
+import { jobService } from './jobService';
 
 const main = async () => {
   const jobId = process.argv[2];
@@ -10,7 +10,7 @@ const main = async () => {
 
   console.log(`Starting scoped embedding worker for jobId: ${jobId}`);
   try {
-    await processQueue(jobId);
+    await jobService.processQueue(jobId);
     console.log(`Scoped worker finished processing for jobId: ${jobId}`);
     process.exit(0);
   } catch (error) {
