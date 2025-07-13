@@ -14,7 +14,7 @@ export async function deleteLibrary(libraryId: string) {
     await client.query('BEGIN');
 
     // Delete all embeddings associated with the library
-    await client.query('DELETE FROM slop_embeddings WHERE library_id = $1', [
+    await client.query('DELETE FROM embeddings WHERE library_id = $1', [
       libraryId,
     ]);
 

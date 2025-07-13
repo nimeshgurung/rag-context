@@ -132,7 +132,7 @@ class RagService {
   /**
    * Ingests code snippets from a job by enriching them with LLM.
    * It first ensures the library exists, then enriches raw snippets with LLM,
-   * creates embeddings for each code snippet and upserts them into the 'slop_embeddings' index.
+   * creates embeddings for each code snippet and upserts them into the 'embeddings' index.
    * @param job - The embedding job containing code snippets data.
    */
   async ingestCodeSnippets(job: EmbeddingJobPayload) {

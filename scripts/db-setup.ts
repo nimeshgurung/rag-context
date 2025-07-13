@@ -21,7 +21,7 @@ async function setupDatabase() {
 
   try {
     console.log('Dropping existing tables...');
-    await pool.query('DROP TABLE IF EXISTS slop_embeddings CASCADE');
+    await pool.query('DROP TABLE IF EXISTS embeddings CASCADE');
     await pool.query('DROP TABLE IF EXISTS libraries CASCADE');
     await pool.query('DROP TABLE IF EXISTS embedding_jobs CASCADE');
     console.log('Existing tables dropped.');
