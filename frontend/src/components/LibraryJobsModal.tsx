@@ -133,13 +133,13 @@ const LibraryJobsModal: React.FC<LibraryJobsModalProps> = ({
         {jobsData && !loading && (
           <>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Total Jobs: {jobsData.totalJobs} across {jobsData.batches.length} batches
+              Total Jobs: {jobsData.totalJobs} across {jobsData.batches?.length || 0} batches
             </Typography>
 
-            {jobsData.batches.length === 0 ? (
+            {(jobsData.batches?.length || 0) === 0 ? (
               <Alert severity="info">No jobs found for this library.</Alert>
             ) : (
-              jobsData.batches.map((batch, index) => (
+              jobsData.batches?.map((batch, index) => (
                 <Accordion key={batch.jobId} defaultExpanded={index === 0}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Box sx={{ width: '100%', display: 'flex', alignItems: 'center', gap: 2 }}>

@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import { PgVector } from '@mastra/pg';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -15,10 +14,6 @@ async function setupDatabase() {
     );
   }
 
-  const store = new PgVector({
-    connectionString: process.env.POSTGRES_CONNECTION_STRING,
-  });
-
   try {
     console.log('Dropping existing tables...');
     await pool.query('DROP TABLE IF EXISTS embeddings CASCADE');
@@ -26,16 +21,23 @@ async function setupDatabase() {
     await pool.query('DROP TABLE IF EXISTS embedding_jobs CASCADE');
     console.log('Existing tables dropped.');
 
-    console.log('Creating indexes with PgVector...');
-    await store.createIndex({ indexName: 'libraries', dimension: 1536 });
-    console.log('Index "libraries" created.');
+    console.log('Creating libraries table...');
+    const createLibrariesTableSql = fs.readFileSync(
+      path.join(__dirname, 'create_libraries_table.sql'),
+      'utf8',
+    );
+    await pool.query(createLibrariesTableSql);
+    console.log('Libraries table created successfully.');
 
-    await store.createIndex({
-      indexName: 'embeddings',
-      dimension: 1536,
-    });
-    console.log('Index "embeddings" created.');
+    console.log('Creating embeddings table...');
+    const createSlopEmbeddingsTableSql = fs.readFileSync(
+      path.join(__dirname, 'create_embeddings_table.sql'),
+      'utf8',
+    );
+    await pool.query(createSlopEmbeddingsTableSql);
+    console.log('Embeddings table created successfully.');
 
+    console.log('Creating embedding jobs table...');
     const createEmbeddingJobsTableSql = fs.readFileSync(
       path.join(__dirname, 'create_embedding_jobs_table.sql'),
       'utf8',
@@ -45,7 +47,6 @@ async function setupDatabase() {
   } catch (error) {
     console.error('Error setting up the database:', error);
   } finally {
-    await store.disconnect();
     await pool.end();
     console.log('Database setup complete.');
   }

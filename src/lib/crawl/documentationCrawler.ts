@@ -2,7 +2,7 @@ import { PlaywrightCrawler, Configuration } from 'crawlee';
 import TurndownService from 'turndown';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
-import { MDocument } from '@mastra/rag';
+import { MarkdownHeaderTextSplitter } from './MarkdownHeaderTextSplitter';
 import { WebScrapeSource } from '../types';
 import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
@@ -47,20 +47,17 @@ export async function crawlDocumentation(
         }
         const markdown = turndownService.turndown(article.content);
 
-        const doc = MDocument.fromMarkdown(markdown);
-        const chunks = await doc.chunk({
-          strategy: 'markdown',
-          headers: [
+        const splitter = new MarkdownHeaderTextSplitter(
+          [
             ['#', 'h1'],
             ['##', 'h2'],
-            ['###', 'h3'],
           ],
-          extract: {
-            title: true,
-            summary: true,
+          {
+            returnEachLine: true,
+            stripHeaders: false,
           },
-          overlap: 50,
-        });
+        );
+        const chunks = splitter.splitText(markdown);
 
         const job: EmbeddingJobPayload = {
           jobId,
@@ -68,7 +65,7 @@ export async function crawlDocumentation(
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          rawSnippets: chunks.map((chunk) => chunk.text).filter(Boolean),
+          rawSnippets: chunks.map((chunk) => chunk.pageContent).filter(Boolean),
           scrapeType: 'documentation',
         };
 

@@ -1,11 +1,11 @@
 import 'dotenv/config';
-import { PgVector } from '@mastra/pg';
 import { embed, embedMany } from 'ai';
 import { openai } from '../ai/service';
-import { EnrichedItem, LibrarySearchResult } from '../types';
+import { EnrichedItem } from '../types';
 import { getEnrichedDataFromLLM } from '../ai/enrichment';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { createHash } from 'crypto';
+import pool from '../db';
 
 if (!process.env.POSTGRES_CONNECTION_STRING) {
   throw new Error('POSTGRES_CONNECTION_STRING is not set');
@@ -20,17 +20,6 @@ if (!process.env.POSTGRES_CONNECTION_STRING) {
  * 3. Results returned to LLM for orchestration
  */
 class RagService {
-  private store: PgVector;
-
-  /**
-   * Initializes the RagService, setting up the connection to the PgVector store.
-   */
-  constructor() {
-    this.store = new PgVector({
-      connectionString: process.env.POSTGRES_CONNECTION_STRING as string,
-    });
-  }
-
   /**
    * Generates a deterministic ID for a content chunk based on library, source, and content.
    * @param libraryId - The ID of the library.
@@ -62,17 +51,22 @@ class RagService {
       value: `${library.name}: ${library.description}`,
     });
 
-    await this.store.upsert({
-      indexName: 'libraries',
-      vectors: [embedding],
-      ids: [library.id],
-      metadata: [
-        {
-          name: library.name,
-          description: library.description,
-        },
+    // Use direct SQL query instead of PgVector upsert
+    await pool.query(
+      `INSERT INTO libraries (id, name, description, embedding)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (id)
+       DO UPDATE SET
+         name = EXCLUDED.name,
+         description = EXCLUDED.description,
+         embedding = EXCLUDED.embedding`,
+      [
+        library.id,
+        library.name,
+        library.description,
+        JSON.stringify(embedding),
       ],
-    });
+    );
   }
 
   /**
@@ -98,10 +92,7 @@ class RagService {
       values: job.rawSnippets,
     });
 
-    const vectors = [];
-    const ids = [];
-    const metadata = [];
-
+    // Insert embeddings using direct SQL
     for (let i = 0; i < job.rawSnippets.length; i++) {
       const chunk = job.rawSnippets[i];
       const embedding = embeddings[i];
@@ -111,22 +102,24 @@ class RagService {
         chunk,
       );
 
-      ids.push(vectorId);
-      vectors.push(embedding);
-      metadata.push({
-        library_id: job.libraryId,
-        original_text: chunk,
-        content_type: 'documentation',
-        source: job.sourceUrl,
-      });
+      await pool.query(
+        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (vector_id)
+         DO UPDATE SET
+           original_text = EXCLUDED.original_text,
+           embedding = EXCLUDED.embedding`,
+        [
+          vectorId,
+          job.libraryId,
+          'documentation',
+          null, // title
+          chunk,
+          job.sourceUrl,
+          JSON.stringify(embedding),
+        ],
+      );
     }
-
-    await this.store.upsert({
-      indexName: 'embeddings',
-      vectors,
-      ids,
-      metadata,
-    });
   }
 
   /**
@@ -169,10 +162,7 @@ class RagService {
       values: enrichedItems.map((item) => item.code),
     });
 
-    const vectors = [];
-    const ids = [];
-    const metadata = [];
-
+    // Insert embeddings using direct SQL
     for (let i = 0; i < enrichedItems.length; i++) {
       const item = enrichedItems[i];
       const embedding = embeddings[i];
@@ -182,26 +172,25 @@ class RagService {
         item.code,
       );
 
-      ids.push(vectorId);
-      vectors.push(embedding);
-
-      metadata.push({
-        library_id: job.libraryId,
-        original_text: item.code,
-        content_type: 'code-example',
-        title: item.title,
-        description: item.description,
-        source: job.sourceUrl,
-        language: item.language,
-      });
+      await pool.query(
+        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (vector_id)
+         DO UPDATE SET
+           title = EXCLUDED.title,
+           original_text = EXCLUDED.original_text,
+           embedding = EXCLUDED.embedding`,
+        [
+          vectorId,
+          job.libraryId,
+          'code-example',
+          item.title,
+          item.code,
+          job.sourceUrl,
+          JSON.stringify(embedding),
+        ],
+      );
     }
-
-    await this.store.upsert({
-      indexName: 'embeddings',
-      vectors,
-      ids,
-      metadata,
-    });
   }
 
   /**
@@ -233,111 +222,30 @@ class RagService {
       values: texts,
     });
 
-    const vectors = [];
-    const ids = [];
-    const metadatas = [];
-
+    // Insert embeddings using direct SQL
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const embedding = embeddings[i];
 
-      ids.push(item.id);
-      vectors.push(embedding);
-      metadatas.push({
-        ...item.metadata,
-        source: sourceUrl,
-      });
+      await pool.query(
+        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (vector_id)
+         DO UPDATE SET
+           title = EXCLUDED.title,
+           original_text = EXCLUDED.original_text,
+           embedding = EXCLUDED.embedding`,
+        [
+          item.id,
+          libraryInfo.libraryId,
+          'api-spec',
+          item.metadata.title || null,
+          item.text,
+          sourceUrl,
+          JSON.stringify(embedding),
+        ],
+      );
     }
-
-    await this.store.upsert({
-      indexName: 'embeddings',
-      vectors,
-      ids,
-      metadata: metadatas,
-    });
-  }
-
-  /**
-   * Searches for libraries based on a query string.
-   * This is the first step in the RAG workflow - finding relevant libraries.
-   * @param query - The search query.
-   * @returns A promise that resolves to an array of library search results.
-   */
-  async searchLibraries(query: string): Promise<LibrarySearchResult[]> {
-    const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
-      value: query,
-    });
-
-    const results = await this.store.query({
-      indexName: 'libraries',
-      queryVector: embedding,
-      topK: 5,
-      includeVector: false,
-    });
-
-    return (
-      results.map((r) => ({
-        libraryId: r.id,
-        name: r.metadata?.name as string,
-        description: r.metadata?.description as string,
-        similarityScore: r.score,
-        keywordScore: 0, // Mastra RAG does not provide a separate keyword score.
-        hybridScore: r.score,
-      })) ?? []
-    );
-  }
-
-  /**
-   * Fetches documentation for a given library, optionally filtered by a topic.
-   * This is the second step in the RAG workflow - getting specific documentation
-   * from a library that was identified in the first step.
-   *
-   * The method filters the vector space by libraryId to ensure only relevant
-   * documentation is returned.
-   *
-   * @param libraryId - The ID of the library to fetch documentation for.
-   * @param options - Options including a search topic and token limit.
-   * @returns A promise that resolves to an array of documentation metadata objects.
-   */
-  async fetchLibraryDocumentation(
-    libraryId: string,
-    options: { topic?: string; tokens?: number },
-  ): Promise<Record<string, unknown>[]> {
-    let queryVector: number[];
-
-    if (options.topic) {
-      const { embedding } = await embed({
-        model: openai.embedding('text-embedding-3-small'),
-        value: options.topic,
-      });
-      queryVector = embedding;
-    } else {
-      // If no topic, we can't do a vector search. We'll just fetch all.
-      // This is a limitation compared to the old implementation which could fetch all without a query vector.
-      // The store.query requires a vector. A possible workaround is to query with a zero vector or random vector,
-      // but that feels wrong. For now, let's assume a topic is always preferred for searching.
-      // A better implementation would be a separate method for fetching all documents for a library without vector search.
-      // For now, returning empty if no topic.
-      // Or, let's just create a dummy embedding for the libraryId itself.
-      const { embedding } = await embed({
-        model: openai.embedding('text-embedding-3-small'),
-        value: libraryId, // Use libraryId as a proxy for the general topic
-      });
-      queryVector = embedding;
-    }
-
-    const results = await this.store.query({
-      indexName: 'embeddings',
-      queryVector: queryVector,
-      topK: 5,
-      filter: { library_id: { $eq: libraryId } }, // This filters the vector space by library
-      includeVector: false,
-    });
-
-    return results
-      .map((r) => r.metadata)
-      .filter((m): m is Record<string, unknown> => m != null);
   }
 
   /**

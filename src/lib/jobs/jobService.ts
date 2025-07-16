@@ -523,20 +523,22 @@ class JobService {
   }
 
   /**
-   * Get all embedding jobs for a library, grouped by crawl batch with summary statistics.
+   * Get all jobs for a specific library, grouped by job batch (crawl ID).
    *
-   * @param libraryId - Library ID to fetch jobs for
-   * @returns Promise with array of JobBatch objects, each representing one crawl operation
-   *          containing all URLs discovered in that crawl plus summary statistics
-   *
-   * Each JobBatch contains:
-   * - jobId: The crawl batch ID (UUID string)
-   * - jobs: Array of individual URL jobs with their database row IDs and status
-   * - summary: Counts of pending/processing/completed/failed jobs in this batch
+   * Returns:
+   * - totalJobs: Total number of individual jobs across all batches
+   * - batches: Array of job batches, each containing:
+   *   - jobId: UUID of the crawl batch
+   *   - createdAt: Timestamp when the batch was created
+   *   - jobs: Array of individual jobs in this batch
+   *   - summary: Counts of pending/processing/completed/failed jobs in this batch
    *
    * Example: getAllJobsForLibrary("react-docs") returns all crawl batches for that library
    */
-  async getAllJobsForLibrary(libraryId: string): Promise<JobBatch[]> {
+  async getAllJobsForLibrary(libraryId: string): Promise<{
+    totalJobs: number;
+    batches: JobBatch[];
+  }> {
     const { rows } = await pool.query(
       `SELECT id, job_id, source_url, status, created_at, processed_at, error_message, scrape_type
        FROM embedding_jobs
@@ -577,7 +579,16 @@ class JobService {
       };
     });
 
-    return Object.values(jobBatches);
+    const batches = Object.values(jobBatches);
+    const totalJobs = batches.reduce(
+      (sum, batch) => sum + batch.jobs.length,
+      0,
+    );
+
+    return {
+      totalJobs,
+      batches,
+    };
   }
 
   /**
