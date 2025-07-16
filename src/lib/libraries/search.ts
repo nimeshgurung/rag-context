@@ -1,5 +1,5 @@
 import { embed } from 'ai';
-import { openai } from '../ai/service';
+import { models } from '../ai/models';
 import pool from '../db';
 import { LibrarySearchResult } from '../types';
 
@@ -7,7 +7,7 @@ export async function searchLibraries(
   libraryName: string,
 ): Promise<LibrarySearchResult[]> {
   const { embedding } = await embed({
-    model: openai.embedding('text-embedding-3-small'),
+    model: models['text-embedding-3-small'],
     value: libraryName,
   });
 
@@ -80,7 +80,7 @@ export async function fetchLibraryDocumentation(
 
   if (options.topic) {
     const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
+      model: models['text-embedding-3-small'],
       value: options.topic,
     });
     query = `

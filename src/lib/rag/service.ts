@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { embed, embedMany } from 'ai';
-import { openai } from '../ai/service';
+import { models } from '../ai/models';
 import { EnrichedItem } from '../types';
 import { getEnrichedDataFromLLM } from '../ai/enrichment';
 import { EmbeddingJobPayload } from '../jobs/jobService';
@@ -47,7 +47,7 @@ class RagService {
     description: string;
   }) {
     const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
+      model: models['text-embedding-3-small'],
       value: `${library.name}: ${library.description}`,
     });
 
@@ -88,7 +88,7 @@ class RagService {
     });
 
     const { embeddings } = await embedMany({
-      model: openai.embedding('text-embedding-3-small'),
+      model: models['text-embedding-3-small'],
       values: job.rawSnippets,
     });
 
@@ -158,7 +158,7 @@ class RagService {
     });
 
     const { embeddings } = await embedMany({
-      model: openai.embedding('text-embedding-3-small'),
+      model: models['text-embedding-3-small'],
       values: enrichedItems.map((item) => item.code),
     });
 
@@ -218,7 +218,7 @@ class RagService {
 
     const texts = items.map((item) => item.text);
     const { embeddings } = await embedMany({
-      model: openai.embedding('text-embedding-3-small'),
+      model: models['text-embedding-3-small'],
       values: texts,
     });
 

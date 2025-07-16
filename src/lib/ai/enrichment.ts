@@ -1,18 +1,21 @@
 import { z } from 'zod';
 import { generateObjectFromPrompt } from '../api';
 import { EnrichedItem } from '../types';
+import { LanguageModel } from 'ai';
 
 /**
  * Enriches a code snippet with a title and description using an LLM.
  * @param {string} code - The clean code snippet.
  * @param {string} contextMarkdown - The surrounding documentation context in Markdown.
  * @param {string} customInstructions - Optional custom instructions to append to the system prompt.
+ * @param {LanguageModel} model - The language model to use for enrichment.
  * @returns {Promise<object>} A promise that resolves to the enriched data object.
  */
 export async function getEnrichedDataFromLLM(
   code: string,
   contextMarkdown: string,
   customInstructions?: string,
+  model?: LanguageModel,
 ): Promise<EnrichedItem> {
   let systemPrompt = `You are an expert programmer and technical writer.
 Your task is to generate a concise, informative title and a brief description for a given code snippet.
@@ -56,6 +59,7 @@ ${code}
       language: z.string(),
       formattedCode: z.string(),
     }),
+    model,
   });
 
   return { ...object, code: object.formattedCode };

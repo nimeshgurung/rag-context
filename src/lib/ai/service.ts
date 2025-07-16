@@ -1,26 +1,21 @@
 import 'dotenv/config';
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateObject } from 'ai';
+import { generateObject, LanguageModel } from 'ai';
 import { z } from 'zod';
-
-// Initialize OpenAI client
-export const openai = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { defaultModel } from './models';
 
 export async function generateObjectFromPrompt<T extends z.ZodTypeAny>({
   prompt,
   systemPrompt,
   schema,
-  model = 'gpt-4o-mini',
+  model = defaultModel,
 }: {
   prompt: string;
   systemPrompt: string;
   schema: T;
-  model?: string;
+  model?: LanguageModel;
 }): Promise<z.infer<T>> {
   const { object } = await generateObject({
-    model: openai(model),
+    model,
     schema,
     prompt,
     system: systemPrompt,
