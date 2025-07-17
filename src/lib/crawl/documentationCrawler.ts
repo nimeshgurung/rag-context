@@ -2,14 +2,18 @@ import { PlaywrightCrawler, Configuration } from 'crawlee';
 import TurndownService from 'turndown';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
-import { MarkdownHeaderTextSplitter } from './MarkdownHeaderTextSplitter';
 import { WebScrapeSource } from '../types';
 import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { getScopeGlob } from './utils';
+import { extractSemanticChunksFromMarkdown } from '../ai/extraction';
+import { MarkdownHeaderTextSplitter } from './MarkdownHeaderTextSplitter';
 
-const turndownService = new TurndownService();
+const turndownService = new TurndownService({
+  codeBlockStyle: 'fenced',
+  headingStyle: 'atx',
+});
 
 export async function crawlDocumentation(
   jobId: string,
@@ -47,17 +51,40 @@ export async function crawlDocumentation(
         }
         const markdown = turndownService.turndown(article.content);
 
-        const splitter = new MarkdownHeaderTextSplitter(
+        console.warn(markdown);
+
+        const headerSplitter = new MarkdownHeaderTextSplitter(
           [
             ['#', 'h1'],
             ['##', 'h2'],
           ],
           {
-            returnEachLine: true,
+            returnEachLine: false,
             stripHeaders: false,
           },
         );
-        const chunks = splitter.splitText(markdown);
+
+        const sections = headerSplitter.splitText(markdown);
+        let allChunks: string[] = [];
+
+        for (const section of sections) {
+          const semanticChunks = await extractSemanticChunksFromMarkdown(
+            section.pageContent,
+          );
+          const formattedChunks = semanticChunks.map((chunk) => {
+            const snippetsFormatted = chunk.snippets
+              .map((s) => {
+                if (s.language === 'text') {
+                  return `${s.code}\n`;
+                } else {
+                  return `Language: ${s.language}\nCode:\n\`\`\`${s.code}\`\`\``;
+                }
+              })
+              .join('\n\n');
+            return `Title: ${chunk.title}\nDescription: ${chunk.description}\n\n${snippetsFormatted}`;
+          });
+          allChunks = allChunks.concat(formattedChunks);
+        }
 
         const job: EmbeddingJobPayload = {
           jobId,
@@ -65,7 +92,7 @@ export async function crawlDocumentation(
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          rawSnippets: chunks.map((chunk) => chunk.pageContent).filter(Boolean),
+          rawSnippets: allChunks.filter(Boolean),
           scrapeType: 'documentation',
         };
 
