@@ -7,8 +7,9 @@ import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { getScopeGlob } from './utils';
-import { extractSemanticChunksFromMarkdown } from '../ai/extraction';
-import { MarkdownHeaderTextSplitter } from './MarkdownHeaderTextSplitter';
+// Remove the expensive LLM imports - we'll do this in phase 2
+// import { extractSemanticChunksFromMarkdown } from '../ai/extraction';
+// import { MarkdownHeaderTextSplitter } from './MarkdownHeaderTextSplitter';
 
 const turndownService = new TurndownService({
   codeBlockStyle: 'fenced',
@@ -49,58 +50,27 @@ export async function crawlDocumentation(
           log.warning(`No readable content found on ${request.url}. Skipping.`);
           return;
         }
+
+        // Phase 1: Just convert to markdown and store - NO expensive LLM processing
         const markdown = turndownService.turndown(article.content);
 
-        console.warn(markdown);
-
-        const headerSplitter = new MarkdownHeaderTextSplitter(
-          [
-            ['#', 'h1'],
-            ['##', 'h2'],
-          ],
-          {
-            returnEachLine: false,
-            stripHeaders: false,
-          },
-        );
-
-        const sections = headerSplitter.splitText(markdown);
-        let allChunks: string[] = [];
-
-        for (const section of sections) {
-          const semanticChunks = await extractSemanticChunksFromMarkdown(
-            section.pageContent,
-          );
-          const formattedChunks = semanticChunks.map((chunk) => {
-            const snippetsFormatted = chunk.snippets
-              .map((s) => {
-                if (s.language === 'text') {
-                  return `${s.code}\n`;
-                } else {
-                  return `Language: ${s.language}\nCode:\n\`\`\`${s.code}\`\`\``;
-                }
-              })
-              .join('\n\n');
-            return `Title: ${chunk.title}\nDescription: ${chunk.description}\n\n${snippetsFormatted}`;
-          });
-          allChunks = allChunks.concat(formattedChunks);
-        }
-
+        // Create job with raw markdown - we'll process it in phase 2
         const job: EmbeddingJobPayload = {
           jobId,
           libraryId,
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          rawSnippets: allChunks.filter(Boolean),
+          rawSnippets: [], // Empty for now - will be populated in phase 2
+          contextMarkdown: markdown, // Store the raw markdown here
           scrapeType: 'documentation',
         };
 
-        if (job.rawSnippets.length > 0) {
-          await enqueueEmbeddingJobs([job]);
-        } else {
-          log.info(`No content chunks to enqueue for ${request.url}.`);
-        }
+        // Always enqueue the job with raw markdown
+        await enqueueEmbeddingJobs([job]);
+        log.info(
+          `Enqueued raw markdown for ${request.url} (${markdown.length} characters)`,
+        );
 
         await enqueueLinks({
           selector: 'a',

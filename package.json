@@ -24,7 +24,8 @@
     "clear-library": "tsx scripts/clear-library-data.ts",
     "build:backend": "npx tsc -p tsconfig.json",
     "dev:backend": "npx tsx watch src/server.ts",
-    "process-all": "tsx src/lib/jobs/worker.ts"
+    "process-all": "tsx src/lib/jobs/worker.ts",
+    "trigger-processing": "tsx scripts/trigger-processing.ts"
   },
   "keywords": [],
   "author": "",

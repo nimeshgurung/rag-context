@@ -74,17 +74,18 @@ interface JobBatch {
  *     job_id UUID NOT NULL,           -- Crawl Batch ID (UUID string)
  *     source_url TEXT NOT NULL,       -- Individual URL
  *     library_id TEXT NOT NULL,       -- Library this belongs to
- *     raw_snippets JSONB,            -- Pre-scraped content chunks
+ *     raw_snippets JSONB,            -- Code snippets (for code scraping)
+ *     context_markdown TEXT,          -- Raw markdown (for documentation scraping)
  *     status VARCHAR(20)              -- pending/processing/completed/failed
  * )
  *
  * Example Data:
  * ------------
- * id | job_id                    | source_url              | status
- * 1  | abc-123-def-456          | https://docs.com/page1  | pending
- * 2  | abc-123-def-456          | https://docs.com/page2  | completed
- * 3  | abc-123-def-456          | https://docs.com/page3  | failed
- * 4  | xyz-789-ghi-012          | https://other.com/api   | pending
+ * id | job_id                    | source_url              | scrape_type    | status
+ * 1  | abc-123-def-456          | https://docs.com/page1  | documentation  | pending
+ * 2  | abc-123-def-456          | https://docs.com/page2  | documentation  | completed
+ * 3  | abc-123-def-456          | https://docs.com/page3  | code           | failed
+ * 4  | xyz-789-ghi-012          | https://other.com/api   | documentation  | pending
  *
  * Method Usage Examples:
  * ---------------------
@@ -92,13 +93,26 @@ interface JobBatch {
  * - processAllJobs("abc-123-def-456")   → Process all URLs from that crawl batch
  * - getCrawlJobStatus("abc-123-def-456") → Get status of all URLs in that batch
  *
- * Processing Flow:
- * ---------------
- * 1. User starts crawl → Creates crawl batch ID (UUID)
- * 2. Crawler discovers URLs → Creates embedding_jobs rows with same job_id
- * 3. Each row contains pre-scraped content (rawSnippets) from crawl phase
- * 4. Processing phase → Converts rawSnippets to embeddings and stores in vector DB
- * 5. No re-crawling occurs during processing - works with existing content
+ * Two-Phase Processing Flow:
+ * -------------------------
+ * Phase 1 - Crawling (Fast):
+ *   1. User starts crawl → Creates crawl batch ID (UUID)
+ *   2. Crawler discovers URLs → Scrapes content quickly
+ *   3. Documentation: Store raw markdown in context_markdown
+ *   4. Code: Store code snippets in raw_snippets
+ *   5. Create embedding_jobs rows with status='pending'
+ *
+ * Phase 2 - Processing (On-demand, LLM-intensive):
+ *   6. User triggers processing → System fetches pending jobs
+ *   7. Documentation: Split markdown → LLM semantic extraction
+ *   8. Code: LLM enrichment of code snippets
+ *   9. Create embeddings → Store in vector database
+ *   10. Mark jobs as completed
+ *
+ * Benefits:
+ * - Crawling phase is fast and doesn't timeout on large pages
+ * - Processing phase can be triggered on-demand or in background
+ * - Failed processing doesn't require re-crawling
  */
 class JobService {
   private queue: PQueue;
@@ -429,9 +443,20 @@ class JobService {
     const job = rows[0];
 
     try {
-      if (!job.raw_snippets || job.raw_snippets.length === 0) {
+      // Check if job has content to process based on job type
+      const hasContent =
+        job.scrape_type === 'documentation'
+          ? job.context_markdown && job.context_markdown.trim().length > 0
+          : job.raw_snippets && job.raw_snippets.length > 0;
+
+      if (!hasContent) {
         await this.markJobAsCompleted(job.id);
-        return { success: true, message: 'Job has no snippets.' };
+        const contentType =
+          job.scrape_type === 'documentation' ? 'markdown' : 'snippets';
+        return {
+          success: true,
+          message: `Job has no ${contentType} to process.`,
+        };
       }
 
       const jobPayload: EmbeddingJobPayload = {
@@ -446,6 +471,9 @@ class JobService {
         customEnrichmentPrompt: job.custom_enrichment_prompt,
       };
 
+      console.log(
+        `Processing ${job.scrape_type} job ${job.id} for ${job.source_url}`,
+      );
       await ragService.processJob(jobPayload);
       await this.markJobAsCompleted(job.id);
 

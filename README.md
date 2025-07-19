@@ -4,7 +4,9 @@ A comprehensive documentation and code snippet management system that crawls, pr
 
 ## Data Flow Architecture
 
-### 1. Job Creation & Initialization
+The system uses a **two-phase approach** to handle large documentation pages efficiently:
+
+### Phase 1: Fast Crawling & Content Extraction (No Timeouts)
 
 **Entry Point**: `src/lib/jobs/service.ts::startCrawlJob()`
 - Creates a unique job ID (UUID)
@@ -12,15 +14,13 @@ A comprehensive documentation and code snippet management system that crawls, pr
 - Initializes library metadata in PgVector `libraries` index
 - Starts background crawling process
 
-### 2. URL Crawling & Content Extraction
-
 **Crawling Logic**: `src/lib/crawl/`
 - **Documentation Crawling** (`documentationCrawler.ts`):
   - Uses Playwright to crawl documentation pages
   - Extracts readable content using Mozilla Readability
   - Converts HTML to Markdown using Turndown
-  - Splits content using MarkdownHeaderTextSplitter
-  - Raw snippets = markdown chunks
+  - **NEW**: Stores raw markdown directly (no LLM processing)
+  - Fast and lightweight - won't timeout on large pages
 
 - **Code Crawling** (`crawler.ts`):
   - Uses Playwright to crawl code example pages
@@ -28,30 +28,53 @@ A comprehensive documentation and code snippet management system that crawls, pr
   - Captures surrounding context as markdown
   - Raw snippets = code blocks
 
-### 3. Temporary Storage (Job Queue)
-
-**Storage Location**: PostgreSQL `embedding_jobs` table
-- Raw snippets stored in `raw_snippets` JSONB column
+**Temporary Storage**: PostgreSQL `embedding_jobs` table
+- **Documentation jobs**: Raw markdown stored in `context_markdown` column
+- **Code jobs**: Raw snippets stored in `raw_snippets` JSONB column
 - Each job contains:
   - `job_id`: Batch identifier
   - `library_id`: Target library
   - `source_url`: Original URL
-  - `raw_snippets`: Array of extracted content
-  - `context_markdown`: Surrounding context (for code)
+  - `context_markdown`: Raw markdown (documentation)
+  - `raw_snippets`: Array of code snippets (code)
   - `scrape_type`: 'documentation' or 'code'
   - `status`: 'pending', 'processing', 'completed', 'failed'
 
-### 4. Job Processing & Enrichment
+### Phase 2: On-Demand Processing & Enrichment (LLM-Intensive)
 
+**Trigger**: User decides when to process (via UI or CLI)
 **Worker Process**: `src/lib/jobs/processQueue.ts`
 - Fetches pending jobs from queue
 - Processes jobs through `ragService.processJob()`
-- **For Documentation**: Direct processing of markdown chunks
+- **For Documentation**:
+  - Splits raw markdown using MarkdownHeaderTextSplitter
+  - LLM semantic extraction via `extractSemanticChunksFromMarkdown()`
+  - Converts to structured chunks with titles and descriptions
 - **For Code**: LLM enrichment via `getEnrichedDataFromLLM()`
   - Adds titles, descriptions, language detection
   - Enhances raw code with context and metadata
 
-### 5. Final Storage (Vector Embeddings)
+**Manual Processing Commands**:
+```bash
+# Process specific crawl batch
+npm run trigger-processing abc-123-def-456
+
+# Process all pending jobs
+npm run trigger-processing --all
+
+# Process latest jobs for a library
+npm run trigger-processing --library react-docs
+```
+
+### Benefits of Two-Phase Approach
+
+✅ **No More Timeouts**: Crawling phase is fast and won't timeout on large documentation pages
+✅ **On-Demand Processing**: Users control when expensive LLM processing happens
+✅ **Fault Tolerance**: Failed processing doesn't require re-crawling
+✅ **Better Resource Management**: Separate lightweight crawling from heavy processing
+✅ **Batch Control**: Process specific libraries or job batches as needed
+
+### Final Storage (Vector Embeddings)
 
 **Storage Location**: PgVector `embeddings` index
 - **Libraries Index**:
@@ -66,7 +89,7 @@ A comprehensive documentation and code snippet management system that crawls, pr
     - `source`: Original URL
     - Additional metadata (title, description, language)
 
-### 6. Retrieval & Search
+### Retrieval & Search
 
 **Search Process**: `src/lib/rag/service.ts`
 1. **Library Search**: `searchLibraries()` - Find relevant libraries

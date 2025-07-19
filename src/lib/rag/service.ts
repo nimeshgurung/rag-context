@@ -71,15 +71,23 @@ class RagService {
 
   /**
    * Ingests documentation chunks from a job.
-   * It first ensures the library exists, then creates embeddings for each chunk
-   * and upserts them into the 'embeddings' index.
-   * @param job - The embedding job containing documentation data.
+   * Phase 2: Process raw markdown stored during crawling into semantic chunks and embeddings.
+   * @param job - The embedding job containing raw markdown data.
    */
   async ingestDocumentation(job: EmbeddingJobPayload) {
-    if (!job.rawSnippets || job.rawSnippets.length === 0) {
-      console.log('No documentation chunks to ingest');
+    // Phase 2: Process raw markdown into semantic chunks
+    if (!job.contextMarkdown || job.contextMarkdown.trim().length === 0) {
+      console.log('No raw markdown to process');
       return;
     }
+
+    // Import the processing modules here (lazy loading)
+    const { extractSemanticChunksFromMarkdown } = await import(
+      '../ai/extraction'
+    );
+    const { MarkdownHeaderTextSplitter } = await import(
+      '../crawl/MarkdownHeaderTextSplitter'
+    );
 
     await this.upsertLibrary({
       id: job.libraryId,
@@ -87,14 +95,68 @@ class RagService {
       description: job.libraryDescription,
     });
 
+    console.log(
+      `Processing ${job.contextMarkdown.length} characters of markdown for ${job.sourceUrl}`,
+    );
+
+    // Split markdown into sections by headers
+    const headerSplitter = new MarkdownHeaderTextSplitter(
+      [
+        ['#', 'h1'],
+        ['##', 'h2'],
+      ],
+      {
+        returnEachLine: false,
+        stripHeaders: false,
+      },
+    );
+
+    const sections = headerSplitter.splitText(job.contextMarkdown);
+    let allChunks: string[] = [];
+
+    // Process each section with LLM to extract semantic chunks
+    for (const section of sections) {
+      try {
+        const semanticChunks = await extractSemanticChunksFromMarkdown(
+          section.pageContent,
+        );
+        const formattedChunks = semanticChunks.map((chunk) => {
+          const snippetsFormatted = chunk.snippets
+            .map((s) => {
+              if (s.language === 'text') {
+                return `${s.code}\n`;
+              } else {
+                return `Language: ${s.language}\nCode:\n\`\`\`${s.code}\`\`\``;
+              }
+            })
+            .join('\n\n');
+          return `Title: ${chunk.title}\nDescription: ${chunk.description}\n\n${snippetsFormatted}`;
+        });
+        allChunks = allChunks.concat(formattedChunks);
+      } catch (error) {
+        console.error(`Error processing section from ${job.sourceUrl}:`, error);
+        // Continue with other sections instead of failing completely
+      }
+    }
+
+    if (allChunks.length === 0) {
+      console.log('No semantic chunks extracted from markdown');
+      return;
+    }
+
+    console.log(
+      `Extracted ${allChunks.length} semantic chunks, creating embeddings...`,
+    );
+
+    // Create embeddings for the processed chunks
     const { embeddings } = await embedMany({
       model: models['text-embedding-3-small'],
-      values: job.rawSnippets,
+      values: allChunks,
     });
 
     // Insert embeddings using direct SQL
-    for (let i = 0; i < job.rawSnippets.length; i++) {
-      const chunk = job.rawSnippets[i];
+    for (let i = 0; i < allChunks.length; i++) {
+      const chunk = allChunks[i];
       const embedding = embeddings[i];
       const vectorId = this.generateDeterministicId(
         job.libraryId,
@@ -120,6 +182,10 @@ class RagService {
         ],
       );
     }
+
+    console.log(
+      `Successfully ingested ${allChunks.length} documentation chunks for ${job.sourceUrl}`,
+    );
   }
 
   /**
@@ -254,16 +320,25 @@ class RagService {
    * @param job - The embedding job to process
    */
   async processJob(job: EmbeddingJobPayload): Promise<void> {
-    if (!job.rawSnippets || job.rawSnippets.length === 0) {
-      console.log(`Job has no snippets, skipping processing.`);
-      return;
-    }
+    console.log(`Processing ${job.scrapeType} job for ${job.sourceUrl}`);
 
     switch (job.scrapeType) {
       case 'documentation':
+        // Documentation jobs use contextMarkdown
+        if (!job.contextMarkdown || job.contextMarkdown.trim().length === 0) {
+          console.log(
+            `Documentation job has no markdown content, skipping processing.`,
+          );
+          return;
+        }
         await this.ingestDocumentation(job);
         break;
       default:
+        // Code jobs use rawSnippets
+        if (!job.rawSnippets || job.rawSnippets.length === 0) {
+          console.log(`Code job has no snippets, skipping processing.`);
+          return;
+        }
         await this.ingestCodeSnippets(job);
     }
   }
