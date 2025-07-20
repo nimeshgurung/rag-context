@@ -9,7 +9,7 @@ import { SlopChunk } from '../../types';
 import { convertToSlopChunks } from '../../slop/converter';
 import { ragService } from '../rag/service';
 import { db } from '../db';
-import { libraries } from '../db/schema';
+import { libraries } from '../schema.js';
 import { eq } from 'drizzle-orm';
 
 export async function handleApiSpecSource(

@@ -6,7 +6,7 @@ import { getEnrichedDataFromLLM } from '../ai/enrichment';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { createHash } from 'crypto';
 import { db } from '../db';
-import { libraries, embeddings } from '../db/schema';
+import { libraries, embeddings } from '../schema.js';
 import { sql } from 'drizzle-orm';
 import { analyzeMarkdownHeaders } from '../ai/service';
 

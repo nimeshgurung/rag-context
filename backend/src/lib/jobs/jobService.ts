@@ -4,7 +4,7 @@ import slug from 'slug';
 import { spawn } from 'child_process';
 import PQueue from 'p-queue';
 import { db } from '../db';
-import { embeddingJobs } from '../db/schema';
+import { embeddingJobs } from '../schema.js';
 import { eq, desc, sql } from 'drizzle-orm';
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
@@ -36,7 +36,7 @@ export interface EmbeddingJobPayload {
   customEnrichmentPrompt?: string;
 }
 
-interface JobBatch {
+export interface JobBatch {
   jobId: string;
   createdAt: Date;
   jobs: {
