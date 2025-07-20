@@ -21,12 +21,14 @@ export class MarkdownHeaderTextSplitter {
 
   constructor(
     headersToSplitOn: HeaderPair[],
-    returnEachLine = false,
-    stripHeaders = true,
+    options: {
+      returnEachLine?: boolean;
+      stripHeaders?: boolean;
+    } = {},
   ) {
     this.headersToSplitOn = headersToSplitOn;
-    this.returnEachLine = returnEachLine;
-    this.stripHeaders = stripHeaders;
+    this.returnEachLine = options.returnEachLine ?? false;
+    this.stripHeaders = options.stripHeaders ?? true;
   }
 
   splitText(text: string): Chunk[] {

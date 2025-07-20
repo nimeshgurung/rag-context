@@ -2,10 +2,17 @@ import pool from '../db';
 import { LibrarySearchResult } from '../types';
 
 export async function getUniqueLibraries(): Promise<LibrarySearchResult[]> {
-  const query =
-    'SELECT id as "libraryId", name, description FROM libraries ORDER BY name ASC;';
-  const { rows } = await pool.query(query);
-  return rows;
+  const result = await pool.query(
+    'SELECT id, name, description FROM libraries ORDER BY name ASC;',
+  );
+  return result.rows.map((row) => ({
+    libraryId: row.id,
+    name: row.name,
+    description: row.description,
+    similarityScore: 0,
+    keywordScore: 0,
+    hybridScore: 0,
+  }));
 }
 
 export async function deleteLibrary(libraryId: string) {
@@ -14,7 +21,7 @@ export async function deleteLibrary(libraryId: string) {
     await client.query('BEGIN');
 
     // Delete all embeddings associated with the library
-    await client.query('DELETE FROM slop_embeddings WHERE library_id = $1', [
+    await client.query('DELETE FROM embeddings WHERE library_id = $1', [
       libraryId,
     ]);
 

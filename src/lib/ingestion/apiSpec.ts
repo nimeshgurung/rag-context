@@ -1,15 +1,14 @@
-import { embed, embedMany } from 'ai';
-import { OpenAPIV3 } from 'openapi-types';
 import slug from 'slug';
 import path from 'path';
 import fs from 'fs/promises';
 import SwaggerParser from '@apidevtools/swagger-parser';
-import { openai } from '../ai/service';
-import pool from '../db';
+import { OpenAPIV3 } from 'openapi-types';
 import { ApiSpecSource } from '../types';
 import { sendEvent, closeConnection } from '../events';
 import { SlopChunk } from '../../types';
 import { convertToSlopChunks } from '../../slop/converter';
+import { ragService } from '../rag/service';
+import pool from '../db'; // Keep for checking existence
 
 export async function handleApiSpecSource(
   jobId: string,
@@ -18,51 +17,49 @@ export async function handleApiSpecSource(
 ) {
   try {
     let libraryId: string;
-    
+    let libraryName: string;
+    let libraryDescription: string;
+
     if (existingLibraryId) {
-      // Use existing library
       libraryId = existingLibraryId;
-      
-      // Verify library exists
       const { rows: existing } = await pool.query(
         'SELECT id, name, description FROM libraries WHERE id = $1',
         [libraryId],
       );
-      
+
       if (existing.length === 0) {
         throw new Error(`Library with id "${libraryId}" does not exist.`);
       }
-      
+      libraryName = existing[0].name;
+      libraryDescription = existing[0].description;
+
       sendEvent(jobId, {
         type: 'progress',
-        message: `Adding API spec to existing library: ${existing[0].name}`,
+        message: `Adding API spec to existing library: ${libraryName}`,
       });
     } else {
-      // Create new library (existing behavior)
-      sendEvent(jobId, {
-        type: 'progress',
-        message: 'Creating library entry...',
-      });
-      
-      libraryId = slug(source.name);
+      libraryName = source.name;
+      libraryDescription = source.description;
+      libraryId = slug(libraryName);
 
       const { rows: existing } = await pool.query(
         'SELECT id FROM libraries WHERE id = $1',
         [libraryId],
       );
       if (existing.length > 0) {
-        throw new Error(`Library with name "${source.name}" already exists.`);
+        throw new Error(`Library with name "${libraryName}" already exists.`);
       }
 
-      const { embedding } = await embed({
-        model: openai.embedding('text-embedding-3-small'),
-        value: `${source.name}: ${source.description}`,
+      sendEvent(jobId, {
+        type: 'progress',
+        message: 'Creating library entry...',
       });
 
-      await pool.query(
-        'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
-        [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
-      );
+      await ragService.upsertLibrary({
+        id: libraryId,
+        name: libraryName,
+        description: libraryDescription,
+      });
 
       sendEvent(jobId, {
         type: 'progress',
@@ -75,7 +72,7 @@ export async function handleApiSpecSource(
       type: 'progress',
       message: 'Storing spec file...',
     });
-    
+
     const storageDir = path.join(process.cwd(), 'storage', 'specs');
     await fs.mkdir(storageDir, { recursive: true });
 
@@ -83,12 +80,11 @@ export async function handleApiSpecSource(
       source.sourceType === 'file' && source.content.trim().startsWith('{')
         ? 'json'
         : 'yaml';
-    
-    // For existing libraries, append timestamp to avoid overwriting
-    const filename = existingLibraryId 
+
+    const filename = existingLibraryId
       ? `${libraryId}_${Date.now()}.${extension}`
       : `${libraryId}.${extension}`;
-    
+
     const filePath = path.join(storageDir, filename);
     await fs.writeFile(filePath, source.content);
 
@@ -111,47 +107,34 @@ export async function handleApiSpecSource(
 
     sendEvent(jobId, {
       type: 'progress',
-      message: `Embedding ${chunks.length} content chunks...`,
-    });
-    const { embeddings: chunkEmbeddings } = await embedMany({
-      model: openai.embedding('text-embedding-3-small'),
-      values: chunks.map((chunk) => chunk.originalText),
+      message: `Ingesting ${chunks.length} content chunks...`,
     });
 
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const embedding = chunkEmbeddings[i];
-        const query = `
-          INSERT INTO slop_embeddings (vector_id, library_id, content_type, original_text, embedding, metadata)
-          VALUES ($1, $2, $3, $4, $5, $6)
-          ON CONFLICT (vector_id) DO NOTHING;
-        `;
-        await client.query(query, [
-          chunk.id,
-          chunk.libraryId,
-          chunk.contentType,
-          chunk.originalText,
-          `[${embedding.join(',')}]`,
-          chunk.metadata,
-        ]);
-        if ((i + 1) % 5 === 0) {
-          sendEvent(jobId, {
-            type: 'progress',
-            message: `Processed ${i + 1} of ${chunks.length} chunks...`,
-          });
-        }
-      }
-      await client.query('COMMIT');
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
-    }
-    
+    const itemsToIngest = chunks.map((chunk) => ({
+      id: chunk.id,
+      text: chunk.originalText,
+      metadata: {
+        library_id: chunk.libraryId,
+        content_type: chunk.contentType,
+        ...chunk.metadata,
+      },
+    }));
+
+    await ragService.ingestApiSpec(
+      {
+        libraryId,
+        libraryName,
+        libraryDescription,
+      },
+      itemsToIngest,
+      source.sourceType === 'file' ? 'uploaded-api-spec' : 'pasted-api-spec',
+    );
+
+    sendEvent(jobId, {
+      type: 'progress',
+      message: 'Ingestion complete.',
+    });
+
     closeConnection(jobId, {
       type: 'done',
       message: existingLibraryId

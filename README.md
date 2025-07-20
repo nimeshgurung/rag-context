@@ -1,37 +1,162 @@
-# rag-context
+# RAG Context System
 
-Internal OpenAPI Documentation Server. An MCP server for intelligent access to internal API documentation.
+A comprehensive documentation and code snippet management system that crawls, processes, and stores library documentation for RAG (Retrieval Augmented Generation) applications.
 
-## Useful Commands
+## Data Flow Architecture
 
-### Access Database
-To connect to the PostgreSQL database inside the Docker container, run:
-`docker exec -it slop_db psql -U slop_user -d slop_db`
+The system uses a **two-phase approach** to handle large documentation pages efficiently:
 
-## Data Ingestion Workflow
+### Phase 1: Fast Crawling & Content Extraction (No Timeouts)
 
-Ingesting documentation into the server is a two-step process designed to be robust and to handle API rate limits gracefully.
+**Entry Point**: `src/lib/jobs/service.ts::startCrawlJob()`
+- Creates a unique job ID (UUID)
+- Generates library ID from library name (slugified)
+- Initializes library metadata in PgVector `libraries` index
+- Starts background crawling process
 
-### Step 1: Crawl and Scrape
+**Crawling Logic**: `src/lib/crawl/`
+- **Documentation Crawling** (`documentationCrawler.ts`):
+  - Uses Playwright to crawl documentation pages
+  - Extracts readable content using Mozilla Readability
+  - Converts HTML to Markdown using Turndown
+  - **NEW**: Stores raw markdown directly (no LLM processing)
+  - Fast and lightweight - won't timeout on large pages
 
-The first step is to crawl the web sources defined in `config/docs-sources.json`. This process scrapes code snippets and their surrounding context from the configured URLs. Instead of processing and embedding them immediately, it adds them to a job queue in the database.
+- **Code Crawling** (`crawler.ts`):
+  - Uses Playwright to crawl code example pages
+  - Extracts code snippets using CSS selectors (`pre > code` by default)
+  - Captures surrounding context as markdown
+  - Raw snippets = code blocks
 
-To run the crawler:
+**Temporary Storage**: PostgreSQL `embedding_jobs` table
+- **Documentation jobs**: Raw markdown stored in `context_markdown` column
+- **Code jobs**: Raw snippets stored in `raw_snippets` JSONB column
+- Each job contains:
+  - `job_id`: Batch identifier
+  - `library_id`: Target library
+  - `source_url`: Original URL
+  - `context_markdown`: Raw markdown (documentation)
+  - `raw_snippets`: Array of code snippets (code)
+  - `scrape_type`: 'documentation' or 'code'
+  - `status`: 'pending', 'processing', 'completed', 'failed'
 
+### Phase 2: On-Demand Processing & Enrichment (LLM-Intensive)
+
+**Trigger**: User decides when to process (via UI or CLI)
+**Worker Process**: `src/lib/jobs/processQueue.ts`
+- Fetches pending jobs from queue
+- Processes jobs through `ragService.processJob()`
+- **For Documentation**:
+  - Splits raw markdown using MarkdownHeaderTextSplitter
+  - LLM semantic extraction via `extractSemanticChunksFromMarkdown()`
+  - Converts to structured chunks with titles and descriptions
+- **For Code**: LLM enrichment via `getEnrichedDataFromLLM()`
+  - Adds titles, descriptions, language detection
+  - Enhances raw code with context and metadata
+
+**Manual Processing Commands**:
 ```bash
-npm run crawl
+# Process specific crawl batch
+npm run trigger-processing abc-123-def-456
+
+# Process all pending jobs
+npm run trigger-processing --all
+
+# Process latest jobs for a library
+npm run trigger-processing --library react-docs
 ```
 
-### Step 2: Process the Embedding Queue
+### Benefits of Two-Phase Approach
 
-The second step is to process the jobs that were enqueued by the crawler. A dedicated worker script fetches these jobs, sends them to the OpenAI API to get embeddings, and then saves the resulting vectors back into the database.
+✅ **No More Timeouts**: Crawling phase is fast and won't timeout on large documentation pages
+✅ **On-Demand Processing**: Users control when expensive LLM processing happens
+✅ **Fault Tolerance**: Failed processing doesn't require re-crawling
+✅ **Better Resource Management**: Separate lightweight crawling from heavy processing
+✅ **Batch Control**: Process specific libraries or job batches as needed
 
-This worker is rate-limited to avoid hitting API limits. You can configure the rate limit by setting the `EMBEDDING_RATE_LIMIT` environment variable (requests per minute).
+### Final Storage (Vector Embeddings)
 
-To run the embedding worker:
+**Storage Location**: PgVector `embeddings` index
+- **Libraries Index**:
+  - Stores library metadata with embeddings
+  - Used for initial library search
+- **Embeddings Index**:
+  - Stores processed snippets as vector embeddings
+  - Each embedding contains:
+    - `library_id`: Source library
+    - `original_text`: The actual content
+    - `content_type`: 'documentation', 'code-example', etc.
+    - `source`: Original URL
+    - Additional metadata (title, description, language)
 
-```bash
-npm run process-embeddings
+### Retrieval & Search
+
+**Search Process**: `src/lib/rag/service.ts`
+1. **Library Search**: `searchLibraries()` - Find relevant libraries
+2. **Documentation Retrieval**: `fetchLibraryDocumentation()` - Get specific content
+3. Vector similarity search within library context
+4. Returns formatted results for LLM consumption
+
+## Key Components
+
+### Database Schema
+```sql
+-- Job queue storage
+embedding_jobs (
+  id SERIAL PRIMARY KEY,
+  job_id UUID,
+  library_id TEXT,
+  source_url TEXT,
+  raw_snippets JSONB,  -- Raw extracted content
+  scrape_type TEXT,
+  status VARCHAR(20),
+  context_markdown TEXT
+)
+
+-- Vector storage (PgVector)
+libraries index     -- Library metadata embeddings
+embeddings index    -- Content embeddings with metadata
 ```
 
-This command will run continuously, processing jobs as they appear in the queue. You can leave it running in the background.
+### Processing Flow
+```
+URL → Crawl → Extract → Store in Jobs Table → Process → Enrich → Embed → Store in Vector DB
+```
+
+### API Endpoints
+- `POST /api/libraries` - Create new library and start crawling
+- `GET /api/libraries` - List all libraries
+- `GET /api/libraries/:id/documentation` - Retrieve library documentation
+- `DELETE /api/libraries/:id` - Delete library and all associated data
+
+## Development
+
+### Setup
+```bash
+npm install
+npm run db:setup  # Creates tables and indexes
+npm run dev       # Starts development server
+```
+
+### Environment Variables
+```bash
+POSTGRES_CONNECTION_STRING=postgresql://...
+OPENAI_API_KEY=sk-...
+```
+
+### Processing Jobs
+```bash
+# Process all pending jobs
+npm run process-all
+
+# Process specific job batch
+npm run process-all <job-id>
+```
+
+## Architecture Benefits
+
+1. **Scalable Processing**: Jobs are queued and processed asynchronously
+2. **Content Deduplication**: Deterministic IDs prevent duplicate content
+3. **Flexible Enrichment**: Custom prompts for different content types
+4. **Efficient Search**: Vector similarity search with library filtering
+5. **Robust Error Handling**: Failed jobs are tracked and can be retried

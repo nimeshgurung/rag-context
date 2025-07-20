@@ -14,13 +14,13 @@ async function clearLibraryData(libraryId: string) {
     console.log(`Starting to delete data for library: ${libraryId}...`);
     await client.query('BEGIN');
 
-    // Delete from slop_embeddings first due to foreign key constraint
+    // Delete from embeddings first due to foreign key constraint
     const deleteEmbeddingsResult = await client.query(
-      'DELETE FROM slop_embeddings WHERE library_id = $1',
+      'DELETE FROM embeddings WHERE library_id = $1',
       [libraryId],
     );
     console.log(
-      `Deleted ${deleteEmbeddingsResult.rowCount} records from slop_embeddings.`,
+      `Deleted ${deleteEmbeddingsResult.rowCount} records from embeddings.`,
     );
 
     // Then delete from the libraries table

@@ -1,5 +1,5 @@
 import { embed } from 'ai';
-import { openai } from '../ai/service';
+import { models } from '../ai/models';
 import pool from '../db';
 import { LibrarySearchResult } from '../types';
 
@@ -7,7 +7,7 @@ export async function searchLibraries(
   libraryName: string,
 ): Promise<LibrarySearchResult[]> {
   const { embedding } = await embed({
-    model: openai.embedding('text-embedding-3-small'),
+    model: models['text-embedding-3-small'],
     value: libraryName,
   });
 
@@ -63,7 +63,7 @@ export async function searchLibraries(
 }
 
 export async function fetchLibraryDocumentation(
-  context7CompatibleLibraryID: string,
+  libraryId: string,
   options: { tokens?: number; topic?: string } = {},
 ): Promise<string> {
   let query;
@@ -80,7 +80,7 @@ export async function fetchLibraryDocumentation(
 
   if (options.topic) {
     const { embedding } = await embed({
-      model: openai.embedding('text-embedding-3-small'),
+      model: models['text-embedding-3-small'],
       value: options.topic,
     });
     query = `
@@ -89,7 +89,7 @@ export async function fetchLibraryDocumentation(
           vector_id,
           1 - (embedding <=> $2) as similarity_score
         FROM
-          slop_embeddings
+          embeddings
         WHERE
           library_id = $1
         ORDER BY
@@ -101,7 +101,7 @@ export async function fetchLibraryDocumentation(
           vector_id,
           ts_rank(fts, plainto_tsquery('english', $3)) as keyword_score
         FROM
-          slop_embeddings
+          embeddings
         WHERE
           library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
           AND fts @@ plainto_tsquery('english', $3)
@@ -115,7 +115,7 @@ export async function fetchLibraryDocumentation(
         COALESCE(ks.keyword_score, 0) as "keywordScore",
         (COALESCE(vs.similarity_score, 0) * 0.7 + COALESCE(ks.keyword_score, 0) * 0.3) as "hybridScore"
       FROM
-        slop_embeddings se
+        embeddings se
       LEFT JOIN
         vector_search vs ON se.vector_id = vs.vector_id
       LEFT JOIN
@@ -126,21 +126,17 @@ export async function fetchLibraryDocumentation(
         "hybridScore" DESC
       LIMIT 5;
     `;
-    queryParams = [
-      context7CompatibleLibraryID,
-      `[${embedding.join(',')}]`,
-      options.topic,
-    ];
+    queryParams = [libraryId, `[${embedding.join(',')}]`, options.topic];
   } else {
     query = `
       SELECT
         ${baseQueryFields}
       FROM
-        slop_embeddings se
+        embeddings se
       WHERE
         library_id = $1
     `;
-    queryParams = [context7CompatibleLibraryID];
+    queryParams = [libraryId];
   }
 
   const { rows } = await pool.query(query, queryParams);
@@ -151,7 +147,7 @@ export async function fetchLibraryDocumentation(
 
   const formattedResults = rows.map((row) => {
     switch (row.content_type) {
-      case 'code-example':
+      case 'code':
         return `
 ### ${row.title || 'Code Example'} \n\n
 **Description:** ${row.description || 'N/A'} \n\n
@@ -159,15 +155,10 @@ export async function fetchLibraryDocumentation(
 ${row.original_text}
 \`\`\` \n\n
         `.trim();
-      case 'guide':
-        return `
-## ${row.title || 'Guide'}
-${row.original_text}
-        `.trim();
       default:
-        return row.original_text;
+        return row.original_text.trim();
     }
   });
 
-  return formattedResults.join('\n\n---\n\n');
+  return formattedResults.join('\n\n--------------------------------\n\n');
 }

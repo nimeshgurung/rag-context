@@ -1,10 +1,9 @@
-import { embed } from 'ai';
 import slug from 'slug';
-import { openai } from '../ai/service';
 import pool from '../db';
 import { WebScrapeSource } from '../types';
 import { sendEvent, closeConnection } from '../events';
-import { crawlSingleSource } from '../crawl/crawler';
+import { crawlSource } from '../crawl/crawler';
+import { ragService } from '../rag/service';
 
 export async function handleWebScrapeSource(
   jobId: string,
@@ -13,21 +12,21 @@ export async function handleWebScrapeSource(
 ) {
   try {
     let libraryId: string;
-    
+
     if (existingLibraryId) {
       // Use existing library
       libraryId = existingLibraryId;
-      
+
       // Verify library exists
       const { rows: existing } = await pool.query(
         'SELECT id, name, description FROM libraries WHERE id = $1',
         [libraryId],
       );
-      
+
       if (existing.length === 0) {
         throw new Error(`Library with id "${libraryId}" does not exist.`);
       }
-      
+
       sendEvent(jobId, {
         type: 'progress',
         message: `Adding resource to existing library: ${existing[0].name}`,
@@ -38,7 +37,7 @@ export async function handleWebScrapeSource(
         type: 'progress',
         message: 'Creating library entry...',
       });
-      
+
       libraryId = slug(source.name);
 
       const { rows: existing } = await pool.query(
@@ -49,15 +48,11 @@ export async function handleWebScrapeSource(
         throw new Error(`Library with name "${source.name}" already exists.`);
       }
 
-      const { embedding } = await embed({
-        model: openai.embedding('text-embedding-3-small'),
-        value: `${source.name}: ${source.description}`,
+      await ragService.upsertLibrary({
+        id: libraryId,
+        name: source.name,
+        description: source.description,
       });
-
-      await pool.query(
-        'INSERT INTO libraries (id, name, description, embedding) VALUES ($1, $2, $3, $4)',
-        [libraryId, source.name, source.description, `[${embedding.join(',')}]`],
-      );
 
       sendEvent(jobId, {
         type: 'progress',
@@ -66,11 +61,11 @@ export async function handleWebScrapeSource(
     }
 
     // Always crawl the source
-    await crawlSingleSource(jobId, source, libraryId, source.description);
+    await crawlSource(jobId, source, libraryId, source.description);
 
     closeConnection(jobId, {
       type: 'done',
-      message: existingLibraryId 
+      message: existingLibraryId
         ? `Resource added to library ${libraryId} successfully.`
         : `Library ${libraryId} crawled and ingested successfully.`,
     });

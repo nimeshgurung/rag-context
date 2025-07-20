@@ -3,32 +3,18 @@ import TurndownService from 'turndown';
 import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 import { WebScrapeSource } from '../types';
-import { enqueueEmbeddingJobs, EmbeddingJobPayload } from '../jobs/storage';
+import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
-import { MarkdownHeaderTextSplitter } from '../splitters/markdownHeaderTextSplitter';
+import { EmbeddingJobPayload } from '../jobs/jobService';
+import { getScopeGlob } from './utils';
+// Remove the expensive LLM imports - we'll do this in phase 2
+// import { extractSemanticChunksFromMarkdown } from '../ai/extraction';
+// import { MarkdownHeaderTextSplitter } from './MarkdownHeaderTextSplitter';
 
 const turndownService = new TurndownService({
-  headingStyle: 'atx',
   codeBlockStyle: 'fenced',
+  headingStyle: 'atx',
 });
-
-function getScopeGlob(url: string): string {
-  const urlObject = new URL(url);
-
-  let path;
-  if (urlObject.hash && urlObject.hash.length > 1) {
-    let hashPath = urlObject.hash.substring(1);
-    if (!hashPath.startsWith('/')) {
-      hashPath = `/${hashPath}`;
-    }
-    path = hashPath;
-  } else {
-    path = urlObject.pathname;
-  }
-
-  const finalPath = path === '/' ? '' : path;
-  return `${urlObject.origin}${finalPath}/**`;
-}
 
 export async function crawlDocumentation(
   jobId: string,
@@ -64,38 +50,27 @@ export async function crawlDocumentation(
           log.warning(`No readable content found on ${request.url}. Skipping.`);
           return;
         }
+
+        // Phase 1: Just convert to markdown and store - NO expensive LLM processing
         const markdown = turndownService.turndown(article.content);
 
-        const splitter = new MarkdownHeaderTextSplitter(
-          [
-            ['#', 'h1'],
-            ['##', 'h2'],
-            ['###', 'h3'],
-            ['####', 'h4'],
-            ['#####', 'h5'],
-            ['######', 'h6'],
-          ],
-          false,
-          false,
-        );
-
-        const chunks = await splitter.splitText(markdown);
-
+        // Create job with raw markdown - we'll process it in phase 2
         const job: EmbeddingJobPayload = {
           jobId,
           libraryId,
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          rawSnippets: chunks.map((chunk) => chunk.pageContent).filter(Boolean),
+          rawSnippets: [], // Empty for now - will be populated in phase 2
+          contextMarkdown: markdown, // Store the raw markdown here
           scrapeType: 'documentation',
         };
 
-        if (job.rawSnippets.length > 0) {
-          await enqueueEmbeddingJobs([job]);
-        } else {
-          log.info(`No content chunks to enqueue for ${request.url}.`);
-        }
+        // Always enqueue the job with raw markdown
+        await enqueueEmbeddingJobs([job]);
+        log.info(
+          `Enqueued raw markdown for ${request.url} (${markdown.length} characters)`,
+        );
 
         await enqueueLinks({
           selector: 'a',
