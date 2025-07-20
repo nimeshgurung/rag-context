@@ -1,5 +1,5 @@
 {
-  "id": "a0e479bf-1fbe-48b3-8c31-4559d5e9b9d3",
+  "id": "2465c25e-0c23-4453-91bd-4c5b3c17fe67",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -247,19 +247,13 @@
         },
         "embedding": {
           "name": "embedding",
-          "type": "text",
+          "type": "vector(1536)",
           "primaryKey": false,
           "notNull": false
         },
         "metadata": {
           "name": "metadata",
           "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fts": {
-          "name": "fts",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -269,9 +263,9 @@
           "name": "embeddings_fts_idx",
           "columns": [
             {
-              "expression": "fts",
-              "isExpression": false,
+              "expression": "to_tsvector('english', \"original_text\")",
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],
@@ -356,13 +350,7 @@
         },
         "embedding": {
           "name": "embedding",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "fts": {
-          "name": "fts",
-          "type": "text",
+          "type": "vector(1536)",
           "primaryKey": false,
           "notNull": false
         }
@@ -372,9 +360,9 @@
           "name": "libraries_fts_idx",
           "columns": [
             {
-              "expression": "fts",
-              "isExpression": false,
+              "expression": "to_tsvector('english', COALESCE(\"name\", '') || ' ' || COALESCE(\"description\", ''))",
               "asc": true,
+              "isExpression": true,
               "nulls": "last"
             }
           ],

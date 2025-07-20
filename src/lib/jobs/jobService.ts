@@ -4,11 +4,25 @@ import slug from 'slug';
 import { spawn } from 'child_process';
 import PQueue from 'p-queue';
 import { db } from '../db';
-import { embeddingJobs, embeddings } from '../db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { embeddingJobs } from '../db/schema';
+import { eq, desc, sql } from 'drizzle-orm';
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
+
+// Type for the raw embedding job row from database
+interface EmbeddingJobRow extends Record<string, unknown> {
+  id: number;
+  job_id: string;
+  library_id: string;
+  library_name: string | null;
+  library_description: string | null;
+  source_url: string;
+  raw_snippets: unknown;
+  context_markdown: string | null;
+  scrape_type: string | null;
+  custom_enrichment_prompt: string | null;
+}
 
 export interface EmbeddingJobPayload {
   jobId?: string;
@@ -20,12 +34,6 @@ export interface EmbeddingJobPayload {
   contextMarkdown?: string;
   scrapeType: 'code' | 'documentation';
   customEnrichmentPrompt?: string;
-}
-
-interface JobStatusRow {
-  id: number;
-  source_url: string;
-  status: string;
 }
 
 interface JobBatch {
@@ -147,7 +155,7 @@ class JobService {
     try {
       await db.transaction(async (tx) => {
         // Prepare the data for bulk insert with proper null handling
-        const jobData = jobs.map(job => ({
+        const jobData = jobs.map((job) => ({
           jobId: job.jobId || '',
           libraryId: job.libraryId,
           libraryName: job.libraryName,
@@ -215,24 +223,25 @@ class JobService {
         }
 
         const result = await tx.execute(query);
-        const jobs = result.rows.map((row: any) => ({
+        const jobs = (result.rows as EmbeddingJobRow[]).map((row) => ({
           id: row.id,
           jobId: row.job_id,
           libraryId: row.library_id,
-          libraryName: row.library_name,
-          libraryDescription: row.library_description,
+          libraryName: row.library_name || '',
+          libraryDescription: row.library_description || '',
           sourceUrl: row.source_url,
-          rawSnippets: row.raw_snippets,
-          contextMarkdown: row.context_markdown,
-          scrapeType: row.scrape_type,
-          customEnrichmentPrompt: row.custom_enrichment_prompt,
+          rawSnippets: Array.isArray(row.raw_snippets) ? row.raw_snippets : [],
+          contextMarkdown: row.context_markdown || undefined,
+          scrapeType:
+            (row.scrape_type as 'code' | 'documentation') || 'documentation',
+          customEnrichmentPrompt: row.custom_enrichment_prompt || undefined,
         }));
 
         if (jobs.length > 0) {
           const jobIds = jobs.map((j) => j.id);
           await tx.execute(sql`
-            UPDATE embedding_jobs 
-            SET status = 'processing', processed_at = NOW() 
+            UPDATE embedding_jobs
+            SET status = 'processing', processed_at = NOW()
             WHERE id = ANY(${jobIds}::int[])
           `);
         }
@@ -264,9 +273,9 @@ class JobService {
   ): Promise<void> {
     await db
       .update(embeddingJobs)
-      .set({ 
-        status: 'failed', 
-        errorMessage: errorMessage 
+      .set({
+        status: 'failed',
+        errorMessage: errorMessage,
       })
       .where(eq(embeddingJobs.id, jobId));
   }
@@ -347,15 +356,15 @@ class JobService {
 
     const summary = {
       total: rows.length,
-      pending: rows.filter(r => r.status === 'pending').length,
-      processing: rows.filter(r => r.status === 'processing').length,
-      completed: rows.filter(r => r.status === 'completed').length,
-      failed: rows.filter(r => r.status === 'failed').length,
+      pending: rows.filter((r) => r.status === 'pending').length,
+      processing: rows.filter((r) => r.status === 'processing').length,
+      completed: rows.filter((r) => r.status === 'completed').length,
+      failed: rows.filter((r) => r.status === 'failed').length,
     };
 
     return {
       summary,
-      jobs: rows.map(r => ({
+      jobs: rows.map((r) => ({
         id: r.id,
         sourceUrl: r.sourceUrl || '',
         status: r.status || 'pending',
@@ -393,8 +402,8 @@ class JobService {
 
         // Delete associated embeddings using raw SQL for JSONB query
         await tx.execute(sql`
-          DELETE FROM embeddings 
-          WHERE library_id = ${libraryId} 
+          DELETE FROM embeddings
+          WHERE library_id = ${libraryId}
           AND metadata->>'source' = ${sourceUrl || ''}
         `);
 
@@ -436,7 +445,9 @@ class JobService {
       const hasContent =
         job.scrapeType === 'documentation'
           ? job.contextMarkdown && job.contextMarkdown.trim().length > 0
-          : job.rawSnippets && Array.isArray(job.rawSnippets) && job.rawSnippets.length > 0;
+          : job.rawSnippets &&
+            Array.isArray(job.rawSnippets) &&
+            job.rawSnippets.length > 0;
 
       if (!hasContent) {
         await this.markJobAsCompleted(job.id);
@@ -456,7 +467,8 @@ class JobService {
         sourceUrl: job.sourceUrl || '',
         rawSnippets: Array.isArray(job.rawSnippets) ? job.rawSnippets : [],
         contextMarkdown: job.contextMarkdown || undefined,
-        scrapeType: (job.scrapeType as 'code' | 'documentation') || 'documentation',
+        scrapeType:
+          (job.scrapeType as 'code' | 'documentation') || 'documentation',
         customEnrichmentPrompt: job.customEnrichmentPrompt || undefined,
       };
 

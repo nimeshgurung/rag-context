@@ -1,6 +1,5 @@
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from './db/schema';
 import 'dotenv/config';
 
 const pool = new Pool({
@@ -12,7 +11,7 @@ const pool = new Pool({
 });
 
 // Drizzle database instance with schema
-export const db = drizzle(pool, { schema });
+export const db = drizzle(process.env.POSTGRES_CONNECTION_STRING!);
 
 // Export the raw pool for backward compatibility during migration
 export default pool;

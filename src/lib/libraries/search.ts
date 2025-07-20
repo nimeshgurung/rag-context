@@ -1,168 +1,163 @@
 import { embed } from 'ai';
 import { models } from '../ai/models';
 import { db } from '../db';
-import { libraries, embeddings } from '../db/schema';
-import { sql, placeholder } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
 import { LibrarySearchResult } from '../types';
+import { embeddings } from '../db/schema';
 
+// Type for the library search query result from stored procedure
+interface LibrarySearchRow {
+  library_id: string;
+  name: string;
+  description: string | null;
+  similarity_score: number;
+  keyword_score: number;
+  hybrid_score: number;
+}
+
+// Type for the documentation search query result from stored procedure
+interface DocumentationRow {
+  vector_id: string;
+  original_text: string;
+  title: string | null;
+  description: string | null;
+  content_type: string;
+  metadata: Record<string, unknown> | null;
+  similarity_score?: number;
+  keyword_score?: number;
+  hybrid_score?: number;
+}
+
+// Type for search analytics result
+interface SearchAnalyticsRow {
+  total_libraries: number;
+  libraries_with_embeddings: number;
+  libraries_with_fts: number;
+  avg_embedding_similarity: number;
+  search_coverage_percent: number;
+}
+
+/**
+ * ✨ STORED PROCEDURE - Complex hybrid search for libraries
+ * Uses PostgreSQL function for optimal performance on complex operations
+ */
 export async function searchLibraries(
   libraryName: string,
+  options: {
+    vectorWeight?: number;
+    keywordWeight?: number;
+    limit?: number;
+  } = {},
 ): Promise<LibrarySearchResult[]> {
+  const { vectorWeight = 0.7, keywordWeight = 0.3, limit = 5 } = options;
+
+  // 🎯 Generate embedding for vector search
   const { embedding } = await embed({
     model: models['text-embedding-3-small'],
     value: libraryName,
   });
 
-  // Complex hybrid search using Drizzle's sql template for pgvector operations
-  const query = sql`
-    WITH vector_search AS (
-      SELECT
-        id,
-        1 - (embedding <=> ${`[${embedding.join(',')}]`}) as similarity_score
-      FROM
-        libraries
-      ORDER BY
-        similarity_score DESC
-      LIMIT 10
-    ),
-    keyword_search AS (
-      SELECT
-        id,
-        ts_rank(fts, plainto_tsquery('english', ${libraryName})) as keyword_score
-      FROM
-        libraries
-      WHERE
-        fts @@ plainto_tsquery('english', ${libraryName})
-      ORDER BY
-        keyword_score DESC
-      LIMIT 10
-    )
-    SELECT
-      l.id as "libraryId",
-      l.name,
-      l.description,
-      COALESCE(vs.similarity_score, 0) as "similarityScore",
-      COALESCE(ks.keyword_score, 0) as "keywordScore",
-      (COALESCE(vs.similarity_score, 0) * 0.7 + COALESCE(ks.keyword_score, 0) * 0.3) as "hybridScore"
-    FROM
-      libraries l
-    LEFT JOIN
-      vector_search vs ON l.id = vs.id
-    LEFT JOIN
-      keyword_search ks ON l.id = ks.id
-    WHERE
-      l.id IN (SELECT id FROM vector_search UNION SELECT id FROM keyword_search)
-    ORDER BY
-      "hybridScore" DESC
-    LIMIT 5
-  `;
+  // 🚀 CALL STORED PROCEDURE - Complex hybrid search logic
+  const result = await db.execute(
+    sql`
+      SELECT * FROM search_libraries_hybrid(
+        ${libraryName}::TEXT,
+        ${JSON.stringify(embedding)}::VECTOR(1536),
+        ${vectorWeight}::DOUBLE PRECISION,
+        ${keywordWeight}::DOUBLE PRECISION,
+        ${limit}::INTEGER
+      )
+    `,
+  );
 
-  const result = await db.execute(query);
-  return result.rows.map((row: any) => ({
-    libraryId: row.libraryId,
+  return (result.rows as unknown as LibrarySearchRow[]).map((row) => ({
+    libraryId: row.library_id,
     name: row.name,
     description: row.description || '',
-    similarityScore: row.similarityScore || 0,
-    keywordScore: row.keywordScore || 0,
-    hybridScore: row.hybridScore || 0,
+    similarityScore: row.similarity_score,
+    keywordScore: row.keyword_score,
+    hybridScore: row.hybrid_score,
   }));
 }
 
+/**
+ * 🎯 HYBRID APPROACH - Complex searches use stored procedures, simple ones use Drizzle ORM
+ * This gives us the best of both worlds: performance for complex operations, type safety for simple ones
+ */
 export async function fetchLibraryDocumentation(
   libraryId: string,
-  options: { tokens?: number; topic?: string } = {},
+  options: {
+    tokens?: number;
+    topic?: string;
+    vectorWeight?: number;
+    keywordWeight?: number;
+    limit?: number;
+  } = {},
 ): Promise<string> {
-  let rows;
+  const { topic, vectorWeight = 0.7, keywordWeight = 0.3, limit = 5 } = options;
 
-  if (options.topic) {
+  let rows: DocumentationRow[];
+
+  if (topic) {
+    // 🚀 COMPLEX CASE: Use stored procedure for hybrid search
     const { embedding } = await embed({
       model: models['text-embedding-3-small'],
-      value: options.topic,
+      value: topic,
     });
-    
-    // Complex hybrid search with topic similarity
-    const query = sql`
-      WITH vector_search AS (
-        SELECT
-          vector_id,
-          1 - (embedding <=> ${`[${embedding.join(',')}]`}) as similarity_score
-        FROM
-          embeddings
-        WHERE
-          library_id = ${libraryId}
-        ORDER BY
-          similarity_score DESC
-        LIMIT 20
-      ),
-      keyword_search AS (
-        SELECT
-          vector_id,
-          ts_rank(fts, plainto_tsquery('english', ${options.topic})) as keyword_score
-        FROM
-          embeddings
-        WHERE
-          library_id = ${libraryId} AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
-          AND fts @@ plainto_tsquery('english', ${options.topic})
-        ORDER BY
-          keyword_score DESC
-        LIMIT 20
-      )
-      SELECT
-        se.vector_id,
-        se.original_text,
-        se.title,
-        se.description,
-        se.content_type,
-        se.metadata,
-        COALESCE(vs.similarity_score, 0) as "similarityScore",
-        COALESCE(ks.keyword_score, 0) as "keywordScore",
-        (COALESCE(vs.similarity_score, 0) * 0.7 + COALESCE(ks.keyword_score, 0) * 0.3) as "hybridScore"
-      FROM
-        embeddings se
-      LEFT JOIN
-        vector_search vs ON se.vector_id = vs.vector_id
-      LEFT JOIN
-        keyword_search ks ON se.vector_id = ks.vector_id
-      WHERE
-        se.vector_id IN (SELECT vector_id FROM vector_search UNION SELECT vector_id FROM keyword_search)
-      ORDER BY
-        "hybridScore" DESC
-      LIMIT 5
-    `;
-    
-    const result = await db.execute(query);
-    rows = result.rows;
+
+    const result = await db.execute(
+      sql`
+        SELECT * FROM search_library_documentation(
+          ${libraryId}::TEXT,
+          ${topic}::TEXT,
+          ${JSON.stringify(embedding)}::VECTOR(1536),
+          ${vectorWeight}::DOUBLE PRECISION,
+          ${keywordWeight}::DOUBLE PRECISION,
+          ${limit}::INTEGER
+        )
+      `,
+    );
+
+    rows = result.rows as unknown as DocumentationRow[];
   } else {
-    // Simple query to get all embeddings for the library
-    const query = sql`
-      SELECT
-        vector_id,
-        original_text,
-        title,
-        description,
-        content_type,
-        metadata
-      FROM
-        embeddings
-      WHERE
-        library_id = ${libraryId}
-    `;
-    
-    const result = await db.execute(query);
-    rows = result.rows;
+    // ✅ SIMPLE CASE: Use Drizzle ORM for type-safe, straightforward query
+    const drizzleRows = await db
+      .select({
+        vector_id: embeddings.vectorId,
+        original_text: embeddings.originalText,
+        title: embeddings.title,
+        description: embeddings.description,
+        content_type: embeddings.contentType,
+        metadata: embeddings.metadata,
+      })
+      .from(embeddings)
+      .where(eq(embeddings.libraryId, libraryId));
+
+    // Transform Drizzle result to match interface
+    rows = drizzleRows.map((row) => ({
+      ...row,
+      metadata: row.metadata as Record<string, unknown> | null,
+    }));
   }
 
   if (rows.length === 0) {
     return 'No documentation found for this library.';
   }
 
-  const formattedResults = rows.map((row: any) => {
+  // 📄 Format results for display
+  const formattedResults = rows.map((row) => {
     switch (row.content_type) {
       case 'code':
+        const language =
+          row.metadata &&
+          typeof row.metadata === 'object' &&
+          'language' in row.metadata
+            ? String(row.metadata.language)
+            : '';
         return `
 ### ${row.title || 'Code Example'} \n\n
 **Description:** ${row.description || 'N/A'} \n\n
-\`\`\`${row.metadata?.language || ''}
+\`\`\`${language}
 ${row.original_text}
 \`\`\` \n\n
         `.trim();
@@ -172,4 +167,28 @@ ${row.original_text}
   });
 
   return formattedResults.join('\n\n--------------------------------\n\n');
+}
+
+/**
+ * 📊 ANALYTICS - Get search system performance metrics
+ * Uses stored procedure for consistent analytics across the system
+ */
+export async function getSearchAnalytics(): Promise<{
+  totalLibraries: number;
+  librariesWithEmbeddings: number;
+  librariesWithFts: number;
+  avgEmbeddingSimilarity: number;
+  searchCoveragePercent: number;
+}> {
+  const result = await db.execute(sql`SELECT * FROM get_search_analytics()`);
+
+  const row = result.rows[0] as unknown as SearchAnalyticsRow;
+
+  return {
+    totalLibraries: row.total_libraries,
+    librariesWithEmbeddings: row.libraries_with_embeddings,
+    librariesWithFts: row.libraries_with_fts,
+    avgEmbeddingSimilarity: parseFloat(row.avg_embedding_similarity.toString()),
+    searchCoveragePercent: parseFloat(row.search_coverage_percent.toString()),
+  };
 }

@@ -54,7 +54,7 @@ export async function handleApiSpecSource(
         .from(libraries)
         .where(eq(libraries.id, libraryId))
         .limit(1);
-        
+
       if (existing.length > 0) {
         throw new Error(`Library with name "${libraryName}" already exists.`);
       }
