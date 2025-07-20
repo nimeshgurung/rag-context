@@ -6,7 +6,6 @@ import {
   Button,
   Paper,
   CircularProgress,
-  Alert,
 } from '@mui/material';
 import { fetchLibraryDocumentation } from '../../services/api';
 
@@ -18,25 +17,21 @@ const SearchTab: React.FC<SearchTabProps> = ({ libraryId }) => {
   const [documentation, setDocumentation] = useState('');
   const [loading, setLoading] = useState(false);
   const [topic, setTopic] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     // Load default documentation when tab first loads
-    if (libraryId && !hasSearched) {
+    if (libraryId && documentation === '') {
       fetchDocs(libraryId);
     }
-  }, [libraryId, hasSearched]);
+  }, [documentation, libraryId]);
 
   const fetchDocs = async (libraryId: string, searchTopic?: string) => {
     try {
       setLoading(true);
       const docs = await fetchLibraryDocumentation(libraryId, searchTopic);
       setDocumentation(docs);
-      setHasSearched(true);
     } catch (error) {
-      console.error('Failed to fetch documentation', error);
-      setDocumentation('Failed to load documentation.');
-      setHasSearched(true);
+      setDocumentation('Failed to load documentation: ' + (error as Error)?.message);
     } finally {
       setLoading(false);
     }
@@ -77,7 +72,7 @@ const SearchTab: React.FC<SearchTabProps> = ({ libraryId }) => {
             variant="contained"
             onClick={handleSearch}
             disabled={loading}
-            sx={{ minWidth: '120px', height: '40px' }}
+            sx={{ minWidth: '120px', height: '40px', alignSelf: 'flex-start' }}
           >
             {loading ? <CircularProgress size={20} /> : 'Search'}
           </Button>
@@ -89,16 +84,6 @@ const SearchTab: React.FC<SearchTabProps> = ({ libraryId }) => {
         <Typography variant="h6" gutterBottom>
           Documentation Results
         </Typography>
-        
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : !hasSearched ? (
-          <Alert severity="info">
-            Enter a search topic above or click "Search" to load documentation.
-          </Alert>
-        ) : documentation ? (
           <TextField
             fullWidth
             multiline
@@ -113,11 +98,6 @@ const SearchTab: React.FC<SearchTabProps> = ({ libraryId }) => {
             rows={25}
             variant="outlined"
           />
-        ) : (
-          <Alert severity="warning">
-            No documentation found. The library may not have been indexed yet.
-          </Alert>
-        )}
       </Paper>
     </Box>
   );

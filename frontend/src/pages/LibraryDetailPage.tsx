@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
   Box,
@@ -6,15 +6,17 @@ import {
   Paper,
   Tabs,
   Tab,
-  Chip,
   CircularProgress,
   Alert,
+  Button,
 } from '@mui/material';
-import { Settings, Search, Work } from '@mui/icons-material';
+import { Search, Work, Add, Delete } from '@mui/icons-material';
 import SearchTab from '../components/LibraryDetail/SearchTab';
 import JobsTab from '../components/LibraryDetail/JobsTab';
-import SettingsTab from '../components/LibraryDetail/SettingsTab';
-import { getLibraries, getAllJobsForLibrary } from '../services/api';
+import { getLibraries, getAllJobsForLibrary, deleteLibrary } from '../services/api';
+import AddDocsModal from '../components/AddDocsModal';
+import { useDialog } from '../context/DialogProvider';
+import { useNavigate } from 'react-router-dom';
 
 interface Library {
   libraryId: string;
@@ -42,14 +44,12 @@ const LibraryDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchLibraryData();
-      fetchJobSummary();
-    }
-  }, [id]);
+  const [addDocsModalOpen, setAddDocsModalOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { showDialog, showConfirm } = useDialog();
+  const navigate = useNavigate();
 
-  const fetchLibraryData = async () => {
+  const fetchLibraryData = useCallback(async () => {
     try {
       const libraries = await getLibraries();
       const foundLibrary = libraries.find(lib => lib.libraryId === id);
@@ -59,13 +59,13 @@ const LibraryDetailPage: React.FC = () => {
         setError('Library not found');
       }
     } catch (err) {
-      setError('Failed to load library data');
+      setError('Failed to load library data: ' + (err as Error)?.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchJobSummary = async () => {
+  const fetchJobSummary = useCallback(async () => {
     if (!id) return;
     try {
       const jobsData = await getAllJobsForLibrary(id);
@@ -84,18 +84,52 @@ const LibraryDetailPage: React.FC = () => {
     } catch (err) {
       console.error('Failed to fetch job summary:', err);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchLibraryData();
+      fetchJobSummary();
+    }
+  }, [id, fetchJobSummary, fetchLibraryData]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
-  const getProgressPercentage = () => {
-    if (!jobSummary || jobSummary.total === 0) return 0;
-    return Math.round((jobSummary.completed / jobSummary.total) * 100);
+  const handleAddResource = () => {
+    setAddDocsModalOpen(true);
   };
 
-  const isProcessing = jobSummary && jobSummary.processing > 0;
+  const handleModalClose = () => {
+    setAddDocsModalOpen(false);
+    // Refresh job data after adding resource
+    fetchJobSummary();
+  };
+
+  const handleDeleteLibrary = async () => {
+    if (!library) return;
+
+    showConfirm(
+      'Confirm Deletion',
+      `Are you sure you want to delete the "${library.name}" library and all its associated data? This action cannot be undone.`,
+      async () => {
+        setDeleting(true);
+        try {
+          await deleteLibrary(library.libraryId);
+          showDialog('Success', 'Library deleted successfully.');
+          navigate('/'); // Redirect to home
+        } catch (error) {
+          console.error('Failed to delete library', error);
+          showDialog('Error', 'Could not delete the library.');
+        } finally {
+          setDeleting(false);
+        }
+      },
+    );
+  };
+
+
 
   if (loading) {
     return (
@@ -129,77 +163,42 @@ const LibraryDetailPage: React.FC = () => {
               ID: {library.libraryId}
             </Typography>
           </Box>
-        </Box>
-
-        {/* Job Status Summary */}
-        {jobSummary && (
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 2, 
-            mt: 2, 
-            p: 2, 
-            bgcolor: 'background.default', 
-            borderRadius: 1 
-          }}>
-            {isProcessing && <CircularProgress size={20} />}
-            <Typography variant="body2">
-              Jobs: {jobSummary.completed}/{jobSummary.total} Complete ({getProgressPercentage()}%)
-            </Typography>
-            <Chip 
-              label={`${jobSummary.completed} completed`} 
-              color="success" 
-              size="small" 
-              variant="outlined" 
-            />
-            {jobSummary.processing > 0 && (
-              <Chip 
-                label={`${jobSummary.processing} processing`} 
-                color="info" 
-                size="small" 
-                variant="outlined" 
-              />
-            )}
-            {jobSummary.pending > 0 && (
-              <Chip 
-                label={`${jobSummary.pending} pending`} 
-                color="warning" 
-                size="small" 
-                variant="outlined" 
-              />
-            )}
-            {jobSummary.failed > 0 && (
-              <Chip 
-                label={`${jobSummary.failed} failed`} 
-                color="error" 
-                size="small" 
-                variant="outlined" 
-              />
-            )}
+          <Box sx={{ display: 'flex', gap: 2, ml: 2 }}>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={handleAddResource}
+            >
+              Add Resource
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<Delete />}
+              onClick={handleDeleteLibrary}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete Library'}
+            </Button>
           </Box>
-        )}
+        </Box>
       </Paper>
 
       {/* Tabs */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs 
-          value={activeTab} 
+        <Tabs
+          value={activeTab}
           onChange={handleTabChange}
           aria-label="library detail tabs"
         >
-          <Tab 
-            icon={<Search />} 
-            label="Search & Results" 
+          <Tab
+            icon={<Search />}
+            label="Search & Results"
             iconPosition="start"
           />
-          <Tab 
-            icon={<Work />} 
+          <Tab
+            icon={<Work />}
             label={`Jobs${jobSummary ? ` (${jobSummary.total})` : ''}`}
-            iconPosition="start"
-          />
-          <Tab 
-            icon={<Settings />} 
-            label="Settings" 
             iconPosition="start"
           />
         </Tabs>
@@ -209,8 +208,14 @@ const LibraryDetailPage: React.FC = () => {
       <Box>
         {activeTab === 0 && <SearchTab libraryId={id!} />}
         {activeTab === 1 && <JobsTab libraryId={id!} onJobsUpdate={fetchJobSummary} />}
-        {activeTab === 2 && <SettingsTab library={library} />}
       </Box>
+
+      {/* Add Docs Modal */}
+      <AddDocsModal
+        open={addDocsModalOpen}
+        onClose={handleModalClose}
+        existingLibrary={{ id: library.libraryId, name: library.name }}
+      />
     </Box>
   );
 };
