@@ -18,7 +18,7 @@ const Layout: React.FC = () => {
         width: '100vw',
       }}
     >
-      <AppBar position="static" color="default" elevation={1}>
+      <AppBar position="fixed" color="default" elevation={1} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -37,6 +37,7 @@ const Layout: React.FC = () => {
           </Box>
         </Toolbar>
       </AppBar>
+      <Toolbar /> {/* This empty Toolbar acts as a spacer for the fixed AppBar */}
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Outlet />
       </Box>
