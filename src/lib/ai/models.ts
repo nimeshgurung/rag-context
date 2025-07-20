@@ -14,7 +14,7 @@ export const groq = createGroq({
 
 // Define models
 export const models = {
-  'gpt-4o-mini': openai('gpt-4o-mini'),
+  'gpt-4.1-mini': openai('gpt-4.1-mini'),
   'meta-llama/llama-4-scout-17b-16e-instruct': groq(
     'meta-llama/llama-4-scout-17b-16e-instruct',
   ),
@@ -22,7 +22,7 @@ export const models = {
 };
 
 // Default model
-export const defaultModel = models['gpt-4o-mini'];
+export const defaultModel = models['gpt-4.1-mini'];
 
 // Function to get a model by name
 export function getModel(modelName: keyof typeof models) {

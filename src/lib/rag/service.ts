@@ -6,6 +6,7 @@ import { getEnrichedDataFromLLM } from '../ai/enrichment';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { createHash } from 'crypto';
 import pool from '../db';
+import { analyzeMarkdownHeaders } from '../ai/service';
 
 if (!process.env.POSTGRES_CONNECTION_STRING) {
   throw new Error('POSTGRES_CONNECTION_STRING is not set');
@@ -99,16 +100,22 @@ class RagService {
       `Processing ${job.contextMarkdown.length} characters of markdown for ${job.sourceUrl}`,
     );
 
-    // Split markdown into sections by headers
+    // Analyze markdown structure with AI to determine optimal header levels
+    const headerAnalysis = await analyzeMarkdownHeaders(job.contextMarkdown);
+
     const headerSplitter = new MarkdownHeaderTextSplitter(
-      [
-        ['#', 'h1'],
-        ['##', 'h2'],
-      ],
+      headerAnalysis.recommendedHeaderLevels.map((h) => [
+        h.symbol,
+        `h${h.level}`,
+      ]),
       {
         returnEachLine: false,
         stripHeaders: false,
       },
+    );
+
+    console.log(
+      `Using AI-recommended headers: ${headerAnalysis.recommendedHeaderLevels.map((h) => h.symbol).join(', ')} (confidence: ${headerAnalysis.confidence})`,
     );
 
     const sections = headerSplitter.splitText(job.contextMarkdown);

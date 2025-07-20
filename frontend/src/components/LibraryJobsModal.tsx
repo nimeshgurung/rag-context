@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -63,13 +63,7 @@ const LibraryJobsModal: React.FC<LibraryJobsModalProps> = ({
   const [jobsData, setJobsData] = useState<JobsData | null>(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (open && libraryId) {
-      fetchJobs();
-    }
-  }, [open, libraryId]);
-
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +74,15 @@ const LibraryJobsModal: React.FC<LibraryJobsModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [libraryId]);
+
+
+  useEffect(() => {
+    if (open && libraryId) {
+      fetchJobs();
+    }
+  }, [open, libraryId, fetchJobs]);
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
