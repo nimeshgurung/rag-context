@@ -1,4 +1,4 @@
-import { SearchResponse } from './types';
+import { SearchResponse } from './backend-client.js';
 
 export function formatSearchResults(searchResponse: SearchResponse): string {
   if (searchResponse.error) {

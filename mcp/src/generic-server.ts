@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { searchLibraries, fetchLibraryDocumentation } from './lib/api.js';
+import { backendClient } from './lib/backend-client.js';
 import { formatSearchResults } from './lib/utils.js';
 
 const resolveLibraryIdInput = z.object({
@@ -38,9 +38,9 @@ async function main() {
       inputSchema: resolveLibraryIdInput.shape,
     },
     async ({ libraryName }) => {
-      const results = await searchLibraries(libraryName);
+      const results = await backendClient.searchLibraries(libraryName);
       return {
-        content: [{ type: 'text', text: formatSearchResults({ results }) }],
+        content: [{ type: 'text', text: formatSearchResults(results) }],
       };
     },
   );
@@ -53,7 +53,7 @@ async function main() {
       inputSchema: getLibraryDocsInput.shape,
     },
     async ({ libraryId, topic, tokens }) => {
-      const docs = await fetchLibraryDocumentation(libraryId, {
+      const docs = await backendClient.fetchLibraryDocumentation(libraryId, {
         topic,
         tokens,
       });

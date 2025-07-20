@@ -2,7 +2,7 @@ import { MCPServer } from '@mastra/mcp';
 import 'dotenv/config';
 import { z } from 'zod';
 import { createTool } from '@mastra/core';
-import { searchLibraries, fetchLibraryDocumentation } from './lib/api.js';
+import { backendClient } from './lib/backend-client.js';
 import { formatSearchResults } from './lib/utils.js';
 import { program } from 'commander';
 import http from 'http';
@@ -39,8 +39,8 @@ const server = new MCPServer({
         .string()
         .describe('A formatted string of search results.'),
       execute: async ({ context }) => {
-        const results = await searchLibraries(context.libraryName);
-        return formatSearchResults({ results });
+        const results = await backendClient.searchLibraries(context.libraryName);
+        return formatSearchResults(results);
       },
     }),
     'get-library-docs': createTool({
@@ -55,7 +55,7 @@ const server = new MCPServer({
         ),
       execute: async ({ context }) => {
         const { libraryId, topic, tokens } = context;
-        return fetchLibraryDocumentation(libraryId, {
+        return backendClient.fetchLibraryDocumentation(libraryId, {
           topic,
           tokens,
         });
