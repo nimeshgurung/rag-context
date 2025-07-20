@@ -1,8 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { searchLibraries, fetchLibraryDocumentation } from './lib/api';
-import { formatSearchResults } from './lib/utils';
+import { searchLibraries, fetchLibraryDocumentation } from './lib/api.js';
+import { formatSearchResults } from './lib/utils.js';
 
 const resolveLibraryIdInput = z.object({
   libraryName: z

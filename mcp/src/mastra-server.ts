@@ -2,8 +2,8 @@ import { MCPServer } from '@mastra/mcp';
 import 'dotenv/config';
 import { z } from 'zod';
 import { createTool } from '@mastra/core';
-import { searchLibraries, fetchLibraryDocumentation } from './lib/api';
-import { formatSearchResults } from './lib/utils';
+import { searchLibraries, fetchLibraryDocumentation } from './lib/api.js';
+import { formatSearchResults } from './lib/utils.js';
 import { program } from 'commander';
 import http from 'http';
 

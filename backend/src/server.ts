@@ -2,10 +2,10 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 
 // Import route modules
-import librariesRoutes from './routes/libraries';
-import documentationRoutes from './routes/documentation';
-import crawlRoutes from './routes/crawl';
-import eventsRoutes from './routes/events';
+import librariesRoutes from './routes/libraries.js';
+import documentationRoutes from './routes/documentation.js';
+import crawlRoutes from './routes/crawl.js';
+import eventsRoutes from './routes/events.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
