@@ -21,7 +21,6 @@ import {
 } from '../services/api';
 import { useDialog } from '../context/DialogProvider';
 import AddDocsModal from '../components/AddDocsModal';
-import LibraryJobsModal from '../components/LibraryJobsModal';
 
 interface Library {
   libraryId: string;
@@ -36,7 +35,6 @@ const HomePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [addDocsModalOpen, setAddDocsModalOpen] = useState(false);
-  const [jobsModalOpen, setJobsModalOpen] = useState(false);
   const [selectedLibrary, setSelectedLibrary] = useState<{ id: string; name: string } | null>(null);
   const { showDialog, showConfirm } = useDialog();
 
@@ -68,10 +66,7 @@ const HomePage: React.FC = () => {
     };
   }, [fetchLibraries]);
 
-  const handleViewJobs = (libraryId: string, libraryName: string) => {
-    setSelectedLibrary({ id: libraryId, name: libraryName });
-    setJobsModalOpen(true);
-  };
+
 
   const handleDeleteLibrary = async (
     libraryId: string,
@@ -154,7 +149,7 @@ const HomePage: React.FC = () => {
                   <TableCell component="th" scope="row">
                     <Link
                       component={RouterLink}
-                      to={`/library?libraryid=${encodeURIComponent(row.libraryId)}`}
+                      to={`/library/${encodeURIComponent(row.libraryId)}`}
                       underline="always"
                     >
                       {row.name}
@@ -166,16 +161,8 @@ const HomePage: React.FC = () => {
                     <Button
                       variant="outlined"
                       size="small"
-                      onClick={() => handleViewJobs(row.libraryId, row.name)}
-                    >
-                      View Jobs
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      size="small"
                       color="primary"
                       onClick={() => handleAddResource(row.libraryId, row.name)}
-                      sx={{ ml: 1 }}
                     >
                       Add Resource
                     </Button>
@@ -208,18 +195,6 @@ const HomePage: React.FC = () => {
         onClose={handleModalClose}
         existingLibrary={selectedLibrary}
       />
-
-      {selectedLibrary && (
-        <LibraryJobsModal
-          open={jobsModalOpen}
-          onClose={() => {
-            setJobsModalOpen(false);
-            setSelectedLibrary(null);
-          }}
-          libraryId={selectedLibrary.id}
-          libraryName={selectedLibrary.name}
-        />
-      )}
     </Box>
   );
 };

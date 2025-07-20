@@ -23,6 +23,7 @@ function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
             <Route path="library" element={<LibraryDetailPage />} />
+            <Route path="library/:libraryId" element={<LibraryDetailPage />} />
             <Route path="add-source" element={<AddSourcePage />} />
             <Route path="jobs/:jobId" element={<JobStatusPage />} />
           </Route>
