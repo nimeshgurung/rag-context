@@ -8,7 +8,9 @@ import { sendEvent, closeConnection } from '../events';
 import { SlopChunk } from '../../types';
 import { convertToSlopChunks } from '../../slop/converter';
 import { ragService } from '../rag/service';
-import pool from '../db'; // Keep for checking existence
+import { db } from '../db';
+import { libraries } from '../db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function handleApiSpecSource(
   jobId: string,
@@ -22,16 +24,21 @@ export async function handleApiSpecSource(
 
     if (existingLibraryId) {
       libraryId = existingLibraryId;
-      const { rows: existing } = await pool.query(
-        'SELECT id, name, description FROM libraries WHERE id = $1',
-        [libraryId],
-      );
+      const existing = await db
+        .select({
+          id: libraries.id,
+          name: libraries.name,
+          description: libraries.description,
+        })
+        .from(libraries)
+        .where(eq(libraries.id, libraryId))
+        .limit(1);
 
       if (existing.length === 0) {
         throw new Error(`Library with id "${libraryId}" does not exist.`);
       }
-      libraryName = existing[0].name;
-      libraryDescription = existing[0].description;
+      libraryName = existing[0].name || '';
+      libraryDescription = existing[0].description || '';
 
       sendEvent(jobId, {
         type: 'progress',
@@ -42,10 +49,12 @@ export async function handleApiSpecSource(
       libraryDescription = source.description;
       libraryId = slug(libraryName);
 
-      const { rows: existing } = await pool.query(
-        'SELECT id FROM libraries WHERE id = $1',
-        [libraryId],
-      );
+      const existing = await db
+        .select({ id: libraries.id })
+        .from(libraries)
+        .where(eq(libraries.id, libraryId))
+        .limit(1);
+        
       if (existing.length > 0) {
         throw new Error(`Library with name "${libraryName}" already exists.`);
       }

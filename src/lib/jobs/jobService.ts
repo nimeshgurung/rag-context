@@ -6,7 +6,6 @@ import PQueue from 'p-queue';
 import { db } from '../db';
 import { embeddingJobs, embeddings } from '../db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
-import pool from '../db'; // Keep for backward compatibility during migration
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
@@ -145,38 +144,29 @@ class JobService {
       return;
     }
 
-    const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      await db.transaction(async (tx) => {
+        // Prepare the data for bulk insert with proper null handling
+        const jobData = jobs.map(job => ({
+          jobId: job.jobId || '',
+          libraryId: job.libraryId,
+          libraryName: job.libraryName,
+          libraryDescription: job.libraryDescription,
+          sourceUrl: job.sourceUrl,
+          rawSnippets: job.rawSnippets,
+          contextMarkdown: job.contextMarkdown || null,
+          scrapeType: job.scrapeType,
+          customEnrichmentPrompt: job.customEnrichmentPrompt || null,
+        }));
 
-      const query = `
-        INSERT INTO embedding_jobs (job_id, library_id, library_name, library_description, source_url, raw_snippets, context_markdown, scrape_type, custom_enrichment_prompt)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `;
+        // Bulk insert using Drizzle
+        await tx.insert(embeddingJobs).values(jobData);
+      });
 
-      for (const job of jobs) {
-        const values = [
-          job.jobId,
-          job.libraryId,
-          job.libraryName,
-          job.libraryDescription,
-          job.sourceUrl,
-          JSON.stringify(job.rawSnippets),
-          job.contextMarkdown,
-          job.scrapeType,
-          job.customEnrichmentPrompt,
-        ];
-        await client.query(query, values);
-      }
-
-      await client.query('COMMIT');
       console.log(`Enqueued ${jobs.length} embedding jobs.`);
     } catch (error) {
-      await client.query('ROLLBACK');
       console.error('Error enqueuing embedding jobs:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -195,55 +185,63 @@ class JobService {
     limit: number,
     jobId?: string,
   ): Promise<(EmbeddingJobPayload & { id: number })[]> {
-    const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      return await db.transaction(async (tx) => {
+        // Complex query with row locking requires raw SQL
+        let query = sql`
+          SELECT *
+          FROM embedding_jobs
+          WHERE status = 'pending'
+        `;
 
-      const params: (string | number)[] = [];
-      let query = `
-        SELECT *
-        FROM embedding_jobs
-        WHERE status = 'pending'
-      `;
+        if (jobId) {
+          query = sql`
+            SELECT *
+            FROM embedding_jobs
+            WHERE status = 'pending' AND job_id = ${jobId}
+            ORDER BY created_at ASC
+            LIMIT ${limit}
+            FOR UPDATE SKIP LOCKED
+          `;
+        } else {
+          query = sql`
+            SELECT *
+            FROM embedding_jobs
+            WHERE status = 'pending'
+            ORDER BY created_at ASC
+            LIMIT ${limit}
+            FOR UPDATE SKIP LOCKED
+          `;
+        }
 
-      if (jobId) {
-        params.push(jobId);
-        query += ` AND job_id = $${params.length}`;
-      }
+        const result = await tx.execute(query);
+        const jobs = result.rows.map((row: any) => ({
+          id: row.id,
+          jobId: row.job_id,
+          libraryId: row.library_id,
+          libraryName: row.library_name,
+          libraryDescription: row.library_description,
+          sourceUrl: row.source_url,
+          rawSnippets: row.raw_snippets,
+          contextMarkdown: row.context_markdown,
+          scrapeType: row.scrape_type,
+          customEnrichmentPrompt: row.custom_enrichment_prompt,
+        }));
 
-      params.push(limit);
-      query += ` ORDER BY created_at ASC LIMIT $${params.length} FOR UPDATE SKIP LOCKED`;
+        if (jobs.length > 0) {
+          const jobIds = jobs.map((j) => j.id);
+          await tx.execute(sql`
+            UPDATE embedding_jobs 
+            SET status = 'processing', processed_at = NOW() 
+            WHERE id = ANY(${jobIds}::int[])
+          `);
+        }
 
-      const res = await client.query(query, params);
-      const jobs = res.rows.map((row) => ({
-        id: row.id,
-        jobId: row.job_id,
-        libraryId: row.library_id,
-        libraryName: row.library_name,
-        libraryDescription: row.library_description,
-        sourceUrl: row.source_url,
-        rawSnippets: row.raw_snippets,
-        contextMarkdown: row.context_markdown,
-        scrapeType: row.scrape_type,
-        customEnrichmentPrompt: row.custom_enrichment_prompt,
-      }));
-
-      if (jobs.length > 0) {
-        const jobIds = jobs.map((j) => j.id);
-        await client.query(
-          `UPDATE embedding_jobs SET status = 'processing', processed_at = NOW() WHERE id = ANY($1::int[])`,
-          [jobIds],
-        );
-      }
-
-      await client.query('COMMIT');
-      return jobs;
+        return jobs;
+      });
     } catch (error) {
-      await client.query('ROLLBACK');
       console.error('Error fetching pending jobs:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -251,15 +249,10 @@ class JobService {
    * Mark a job as completed.
    */
   private async markJobAsCompleted(jobId: number): Promise<void> {
-    const client = await pool.connect();
-    try {
-      await client.query(
-        `UPDATE embedding_jobs SET status = 'completed' WHERE id = $1`,
-        [jobId],
-      );
-    } finally {
-      client.release();
-    }
+    await db
+      .update(embeddingJobs)
+      .set({ status: 'completed' })
+      .where(eq(embeddingJobs.id, jobId));
   }
 
   /**
@@ -269,15 +262,13 @@ class JobService {
     jobId: number,
     errorMessage: string,
   ): Promise<void> {
-    const client = await pool.connect();
-    try {
-      await client.query(
-        `UPDATE embedding_jobs SET status = 'failed', error_message = $1 WHERE id = $2`,
-        [errorMessage, jobId],
-      );
-    } finally {
-      client.release();
-    }
+    await db
+      .update(embeddingJobs)
+      .set({ 
+        status: 'failed', 
+        errorMessage: errorMessage 
+      })
+      .where(eq(embeddingJobs.id, jobId));
   }
 
   /**
@@ -304,17 +295,13 @@ class JobService {
     const jobId = uuidv4();
     const libraryId = slug(libraryName);
 
-    const client = await pool.connect();
     try {
-      await client.query('BEGIN');
-
+      // Upsert library (now atomic with Drizzle)
       await ragService.upsertLibrary({
         id: libraryId,
         name: libraryName,
         description: libraryDescription,
       });
-
-      await client.query('COMMIT');
 
       const source: WebScrapeSource = {
         name: libraryName,
@@ -332,11 +319,8 @@ class JobService {
 
       return jobId;
     } catch (error) {
-      await client.query('ROLLBACK');
       console.error('Error starting crawl job:', error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -389,41 +373,39 @@ class JobService {
    * Example: deleteJob(3) deletes just the URL in database row 3 and its embeddings
    */
   async deleteJob(jobItemId: number) {
-    const client = await pool.connect();
     try {
-      await client.query('BEGIN');
+      return await db.transaction(async (tx) => {
+        // Get job details first
+        const job = await tx
+          .select({
+            sourceUrl: embeddingJobs.sourceUrl,
+            libraryId: embeddingJobs.libraryId,
+          })
+          .from(embeddingJobs)
+          .where(eq(embeddingJobs.id, jobItemId))
+          .limit(1);
 
-      const jobResult = await client.query(
-        'SELECT source_url, library_id FROM embedding_jobs WHERE id = $1',
-        [jobItemId],
-      );
+        if (job.length === 0) {
+          throw new Error(`Job item with ID ${jobItemId} not found.`);
+        }
 
-      if (jobResult.rows.length === 0) {
-        throw new Error(`Job item with ID ${jobItemId} not found.`);
-      }
+        const { sourceUrl, libraryId } = job[0];
 
-      const { source_url: sourceUrl, library_id: libraryId } =
-        jobResult.rows[0];
+        // Delete associated embeddings using raw SQL for JSONB query
+        await tx.execute(sql`
+          DELETE FROM embeddings 
+          WHERE library_id = ${libraryId} 
+          AND metadata->>'source' = ${sourceUrl || ''}
+        `);
 
-      // Delete associated embeddings
-      await client.query(
-        "DELETE FROM embeddings WHERE library_id = $1 AND metadata->>'source' = $2",
-        [libraryId, sourceUrl],
-      );
+        // Delete the job
+        await tx.delete(embeddingJobs).where(eq(embeddingJobs.id, jobItemId));
 
-      // Delete the job
-      await client.query('DELETE FROM embedding_jobs WHERE id = $1', [
-        jobItemId,
-      ]);
-
-      await client.query('COMMIT');
-      return { success: true };
+        return { success: true };
+      });
     } catch (error) {
-      await client.query('ROLLBACK');
       console.error(`Failed to delete job item ${jobItemId}:`, error);
       throw error;
-    } finally {
-      client.release();
     }
   }
 
@@ -578,32 +560,40 @@ class JobService {
     totalJobs: number;
     batches: JobBatch[];
   }> {
-    const { rows } = await pool.query(
-      `SELECT id, job_id, source_url, status, created_at, processed_at, error_message, scrape_type
-       FROM embedding_jobs
-       WHERE library_id = $1
-       ORDER BY created_at DESC`,
-      [libraryId],
-    );
+    const rows = await db
+      .select({
+        id: embeddingJobs.id,
+        jobId: embeddingJobs.jobId,
+        sourceUrl: embeddingJobs.sourceUrl,
+        status: embeddingJobs.status,
+        createdAt: embeddingJobs.createdAt,
+        processedAt: embeddingJobs.processedAt,
+        errorMessage: embeddingJobs.errorMessage,
+        scrapeType: embeddingJobs.scrapeType,
+      })
+      .from(embeddingJobs)
+      .where(eq(embeddingJobs.libraryId, libraryId))
+      .orderBy(desc(embeddingJobs.createdAt));
 
     const jobBatches: { [key: string]: JobBatch } = {};
 
     for (const row of rows) {
-      if (!jobBatches[row.job_id]) {
-        jobBatches[row.job_id] = {
-          jobId: row.job_id,
-          createdAt: row.created_at,
+      const jobIdKey = row.jobId || '';
+      if (!jobBatches[jobIdKey]) {
+        jobBatches[jobIdKey] = {
+          jobId: jobIdKey,
+          createdAt: row.createdAt || new Date(),
           jobs: [],
         };
       }
 
-      jobBatches[row.job_id].jobs.push({
+      jobBatches[jobIdKey].jobs.push({
         id: row.id,
-        sourceUrl: row.source_url,
-        status: row.status,
-        processedAt: row.processed_at,
-        errorMessage: row.error_message,
-        scrapeType: row.scrape_type,
+        sourceUrl: row.sourceUrl || '',
+        status: row.status || 'pending',
+        processedAt: row.processedAt,
+        errorMessage: row.errorMessage,
+        scrapeType: row.scrapeType || 'documentation',
       });
     }
 

@@ -1,5 +1,7 @@
 import slug from 'slug';
-import pool from '../db';
+import { db } from '../db';
+import { libraries } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { WebScrapeSource } from '../types';
 import { sendEvent, closeConnection } from '../events';
 import { crawlSource } from '../crawl/crawler';
@@ -18,10 +20,15 @@ export async function handleWebScrapeSource(
       libraryId = existingLibraryId;
 
       // Verify library exists
-      const { rows: existing } = await pool.query(
-        'SELECT id, name, description FROM libraries WHERE id = $1',
-        [libraryId],
-      );
+      const existing = await db
+        .select({
+          id: libraries.id,
+          name: libraries.name,
+          description: libraries.description,
+        })
+        .from(libraries)
+        .where(eq(libraries.id, libraryId))
+        .limit(1);
 
       if (existing.length === 0) {
         throw new Error(`Library with id "${libraryId}" does not exist.`);
@@ -40,10 +47,12 @@ export async function handleWebScrapeSource(
 
       libraryId = slug(source.name);
 
-      const { rows: existing } = await pool.query(
-        'SELECT id FROM libraries WHERE id = $1',
-        [libraryId],
-      );
+      const existing = await db
+        .select({ id: libraries.id })
+        .from(libraries)
+        .where(eq(libraries.id, libraryId))
+        .limit(1);
+        
       if (existing.length > 0) {
         throw new Error(`Library with name "${source.name}" already exists.`);
       }

@@ -5,7 +5,9 @@ import { EnrichedItem } from '../types';
 import { getEnrichedDataFromLLM } from '../ai/enrichment';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { createHash } from 'crypto';
-import pool from '../db';
+import { db } from '../db';
+import { libraries, embeddings } from '../db/schema';
+import { sql } from 'drizzle-orm';
 import { analyzeMarkdownHeaders } from '../ai/service';
 
 if (!process.env.POSTGRES_CONNECTION_STRING) {
@@ -52,22 +54,16 @@ class RagService {
       value: `${library.name}: ${library.description}`,
     });
 
-    // Use direct SQL query instead of PgVector upsert
-    await pool.query(
-      `INSERT INTO libraries (id, name, description, embedding)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (id)
-       DO UPDATE SET
-         name = EXCLUDED.name,
-         description = EXCLUDED.description,
-         embedding = EXCLUDED.embedding`,
-      [
-        library.id,
-        library.name,
-        library.description,
-        JSON.stringify(embedding),
-      ],
-    );
+    // Use Drizzle upsert with raw SQL for vector data
+    await db.execute(sql`
+      INSERT INTO libraries (id, name, description, embedding)
+      VALUES (${library.id}, ${library.name}, ${library.description}, ${JSON.stringify(embedding)})
+      ON CONFLICT (id)
+      DO UPDATE SET
+        name = EXCLUDED.name,
+        description = EXCLUDED.description,
+        embedding = EXCLUDED.embedding
+    `);
   }
 
   /**
@@ -171,23 +167,14 @@ class RagService {
         chunk,
       );
 
-      await pool.query(
-        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (vector_id)
-         DO UPDATE SET
-           original_text = EXCLUDED.original_text,
-           embedding = EXCLUDED.embedding`,
-        [
-          vectorId,
-          job.libraryId,
-          'documentation',
-          null, // title
-          chunk,
-          job.sourceUrl,
-          JSON.stringify(embedding),
-        ],
-      );
+      await db.execute(sql`
+        INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
+        VALUES (${vectorId}, ${job.libraryId}, ${'documentation'}, ${null}, ${chunk}, ${job.sourceUrl}, ${JSON.stringify(embedding)})
+        ON CONFLICT (vector_id)
+        DO UPDATE SET
+          original_text = EXCLUDED.original_text,
+          embedding = EXCLUDED.embedding
+      `);
     }
 
     console.log(
@@ -245,24 +232,15 @@ class RagService {
         item.code,
       );
 
-      await pool.query(
-        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (vector_id)
-         DO UPDATE SET
-           title = EXCLUDED.title,
-           original_text = EXCLUDED.original_text,
-           embedding = EXCLUDED.embedding`,
-        [
-          vectorId,
-          job.libraryId,
-          'code-example',
-          item.title,
-          item.code,
-          job.sourceUrl,
-          JSON.stringify(embedding),
-        ],
-      );
+      await db.execute(sql`
+        INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
+        VALUES (${vectorId}, ${job.libraryId}, ${'code-example'}, ${item.title}, ${item.code}, ${job.sourceUrl}, ${JSON.stringify(embedding)})
+        ON CONFLICT (vector_id)
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          original_text = EXCLUDED.original_text,
+          embedding = EXCLUDED.embedding
+      `);
     }
   }
 
@@ -300,24 +278,15 @@ class RagService {
       const item = items[i];
       const embedding = embeddings[i];
 
-      await pool.query(
-        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (vector_id)
-         DO UPDATE SET
-           title = EXCLUDED.title,
-           original_text = EXCLUDED.original_text,
-           embedding = EXCLUDED.embedding`,
-        [
-          item.id,
-          libraryInfo.libraryId,
-          'api-spec',
-          item.metadata.title || null,
-          item.text,
-          sourceUrl,
-          JSON.stringify(embedding),
-        ],
-      );
+      await db.execute(sql`
+        INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
+        VALUES (${item.id}, ${libraryInfo.libraryId}, ${'api-spec'}, ${item.metadata.title || null}, ${item.text}, ${sourceUrl}, ${JSON.stringify(embedding)})
+        ON CONFLICT (vector_id)
+        DO UPDATE SET
+          title = EXCLUDED.title,
+          original_text = EXCLUDED.original_text,
+          embedding = EXCLUDED.embedding
+      `);
     }
   }
 
