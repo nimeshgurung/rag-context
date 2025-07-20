@@ -1,6 +1,8 @@
 import { embed } from 'ai';
 import { models } from '../ai/models';
-import pool from '../db';
+import { db } from '../db';
+import { libraries, embeddings } from '../db/schema';
+import { sql, placeholder } from 'drizzle-orm';
 import { LibrarySearchResult } from '../types';
 
 export async function searchLibraries(
@@ -11,11 +13,12 @@ export async function searchLibraries(
     value: libraryName,
   });
 
-  const query = `
+  // Complex hybrid search using Drizzle's sql template for pgvector operations
+  const query = sql`
     WITH vector_search AS (
       SELECT
         id,
-        1 - (embedding <=> $1) as similarity_score
+        1 - (embedding <=> ${`[${embedding.join(',')}]`}) as similarity_score
       FROM
         libraries
       ORDER BY
@@ -25,11 +28,11 @@ export async function searchLibraries(
     keyword_search AS (
       SELECT
         id,
-        ts_rank(fts, plainto_tsquery('english', $2)) as keyword_score
+        ts_rank(fts, plainto_tsquery('english', ${libraryName})) as keyword_score
       FROM
         libraries
       WHERE
-        fts @@ plainto_tsquery('english', $2)
+        fts @@ plainto_tsquery('english', ${libraryName})
       ORDER BY
         keyword_score DESC
       LIMIT 10
@@ -51,47 +54,42 @@ export async function searchLibraries(
       l.id IN (SELECT id FROM vector_search UNION SELECT id FROM keyword_search)
     ORDER BY
       "hybridScore" DESC
-    LIMIT 5;
+    LIMIT 5
   `;
 
-  const { rows } = await pool.query(query, [
-    `[${embedding.join(',')}]`,
-    libraryName,
-  ]);
-
-  return rows;
+  const result = await db.execute(query);
+  return result.rows.map((row: any) => ({
+    libraryId: row.libraryId,
+    name: row.name,
+    description: row.description || '',
+    similarityScore: row.similarityScore || 0,
+    keywordScore: row.keywordScore || 0,
+    hybridScore: row.hybridScore || 0,
+  }));
 }
 
 export async function fetchLibraryDocumentation(
   libraryId: string,
   options: { tokens?: number; topic?: string } = {},
 ): Promise<string> {
-  let query;
-  let queryParams;
-
-  const baseQueryFields = `
-    se.vector_id,
-    se.original_text,
-    se.title,
-    se.description,
-    se.content_type,
-    se.metadata
-  `;
+  let rows;
 
   if (options.topic) {
     const { embedding } = await embed({
       model: models['text-embedding-3-small'],
       value: options.topic,
     });
-    query = `
+    
+    // Complex hybrid search with topic similarity
+    const query = sql`
       WITH vector_search AS (
         SELECT
           vector_id,
-          1 - (embedding <=> $2) as similarity_score
+          1 - (embedding <=> ${`[${embedding.join(',')}]`}) as similarity_score
         FROM
           embeddings
         WHERE
-          library_id = $1
+          library_id = ${libraryId}
         ORDER BY
           similarity_score DESC
         LIMIT 20
@@ -99,18 +97,23 @@ export async function fetchLibraryDocumentation(
       keyword_search AS (
         SELECT
           vector_id,
-          ts_rank(fts, plainto_tsquery('english', $3)) as keyword_score
+          ts_rank(fts, plainto_tsquery('english', ${options.topic})) as keyword_score
         FROM
           embeddings
         WHERE
-          library_id = $1 AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
-          AND fts @@ plainto_tsquery('english', $3)
+          library_id = ${libraryId} AND content_type IN ('OPERATION', 'SCHEMA_DEFINITION', 'API_OVERVIEW', 'guide', 'code-example')
+          AND fts @@ plainto_tsquery('english', ${options.topic})
         ORDER BY
           keyword_score DESC
         LIMIT 20
       )
       SELECT
-        ${baseQueryFields},
+        se.vector_id,
+        se.original_text,
+        se.title,
+        se.description,
+        se.content_type,
+        se.metadata,
         COALESCE(vs.similarity_score, 0) as "similarityScore",
         COALESCE(ks.keyword_score, 0) as "keywordScore",
         (COALESCE(vs.similarity_score, 0) * 0.7 + COALESCE(ks.keyword_score, 0) * 0.3) as "hybridScore"
@@ -124,28 +127,36 @@ export async function fetchLibraryDocumentation(
         se.vector_id IN (SELECT vector_id FROM vector_search UNION SELECT vector_id FROM keyword_search)
       ORDER BY
         "hybridScore" DESC
-      LIMIT 5;
+      LIMIT 5
     `;
-    queryParams = [libraryId, `[${embedding.join(',')}]`, options.topic];
+    
+    const result = await db.execute(query);
+    rows = result.rows;
   } else {
-    query = `
+    // Simple query to get all embeddings for the library
+    const query = sql`
       SELECT
-        ${baseQueryFields}
+        vector_id,
+        original_text,
+        title,
+        description,
+        content_type,
+        metadata
       FROM
-        embeddings se
+        embeddings
       WHERE
-        library_id = $1
+        library_id = ${libraryId}
     `;
-    queryParams = [libraryId];
+    
+    const result = await db.execute(query);
+    rows = result.rows;
   }
-
-  const { rows } = await pool.query(query, queryParams);
 
   if (rows.length === 0) {
     return 'No documentation found for this library.';
   }
 
-  const formattedResults = rows.map((row) => {
+  const formattedResults = rows.map((row: any) => {
     switch (row.content_type) {
       case 'code':
         return `
@@ -156,7 +167,7 @@ ${row.original_text}
 \`\`\` \n\n
         `.trim();
       default:
-        return row.original_text.trim();
+        return String(row.original_text).trim();
     }
   });
 

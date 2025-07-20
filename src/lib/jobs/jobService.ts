@@ -3,7 +3,10 @@ import { v4 as uuidv4 } from 'uuid';
 import slug from 'slug';
 import { spawn } from 'child_process';
 import PQueue from 'p-queue';
-import pool from '../db';
+import { db } from '../db';
+import { embeddingJobs, embeddings } from '../db/schema';
+import { eq, and, desc, sql } from 'drizzle-orm';
+import pool from '../db'; // Keep for backward compatibility during migration
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
@@ -348,27 +351,30 @@ class JobService {
    *          in that crawl batch with counts of pending/processing/completed/failed
    */
   async getCrawlJobStatus(jobId: string) {
-    const { rows } = await pool.query<JobStatusRow>(
-      'SELECT id, source_url, status FROM embedding_jobs WHERE job_id = $1 ORDER BY id',
-      [jobId],
-    );
+    const rows = await db
+      .select({
+        id: embeddingJobs.id,
+        sourceUrl: embeddingJobs.sourceUrl,
+        status: embeddingJobs.status,
+      })
+      .from(embeddingJobs)
+      .where(eq(embeddingJobs.jobId, jobId))
+      .orderBy(embeddingJobs.id);
 
     const summary = {
       total: rows.length,
-      pending: rows.filter((r: JobStatusRow) => r.status === 'pending').length,
-      processing: rows.filter((r: JobStatusRow) => r.status === 'processing')
-        .length,
-      completed: rows.filter((r: JobStatusRow) => r.status === 'completed')
-        .length,
-      failed: rows.filter((r: JobStatusRow) => r.status === 'failed').length,
+      pending: rows.filter(r => r.status === 'pending').length,
+      processing: rows.filter(r => r.status === 'processing').length,
+      completed: rows.filter(r => r.status === 'completed').length,
+      failed: rows.filter(r => r.status === 'failed').length,
     };
 
     return {
       summary,
-      jobs: rows.map((r: JobStatusRow) => ({
+      jobs: rows.map(r => ({
         id: r.id,
-        sourceUrl: r.source_url,
-        status: r.status,
+        sourceUrl: r.sourceUrl || '',
+        status: r.status || 'pending',
       })),
     };
   }
@@ -431,10 +437,11 @@ class JobService {
    * Example: processSingleJob(3) processes just the URL in database row 3
    */
   async processSingleJob(jobItemId: number) {
-    const { rows } = await pool.query(
-      'SELECT * FROM embedding_jobs WHERE id = $1',
-      [jobItemId],
-    );
+    const rows = await db
+      .select()
+      .from(embeddingJobs)
+      .where(eq(embeddingJobs.id, jobItemId))
+      .limit(1);
 
     if (rows.length === 0) {
       throw new Error(`Job with ID ${jobItemId} not found.`);
@@ -445,14 +452,14 @@ class JobService {
     try {
       // Check if job has content to process based on job type
       const hasContent =
-        job.scrape_type === 'documentation'
-          ? job.context_markdown && job.context_markdown.trim().length > 0
-          : job.raw_snippets && job.raw_snippets.length > 0;
+        job.scrapeType === 'documentation'
+          ? job.contextMarkdown && job.contextMarkdown.trim().length > 0
+          : job.rawSnippets && Array.isArray(job.rawSnippets) && job.rawSnippets.length > 0;
 
       if (!hasContent) {
         await this.markJobAsCompleted(job.id);
         const contentType =
-          job.scrape_type === 'documentation' ? 'markdown' : 'snippets';
+          job.scrapeType === 'documentation' ? 'markdown' : 'snippets';
         return {
           success: true,
           message: `Job has no ${contentType} to process.`,
@@ -460,19 +467,19 @@ class JobService {
       }
 
       const jobPayload: EmbeddingJobPayload = {
-        jobId: job.job_id,
-        libraryId: job.library_id,
-        libraryName: job.library_name,
-        libraryDescription: job.library_description,
-        sourceUrl: job.source_url,
-        rawSnippets: job.raw_snippets,
-        contextMarkdown: job.context_markdown,
-        scrapeType: job.scrape_type,
-        customEnrichmentPrompt: job.custom_enrichment_prompt,
+        jobId: job.jobId || '',
+        libraryId: job.libraryId || '',
+        libraryName: job.libraryName || '',
+        libraryDescription: job.libraryDescription || '',
+        sourceUrl: job.sourceUrl || '',
+        rawSnippets: Array.isArray(job.rawSnippets) ? job.rawSnippets : [],
+        contextMarkdown: job.contextMarkdown || undefined,
+        scrapeType: (job.scrapeType as 'code' | 'documentation') || 'documentation',
+        customEnrichmentPrompt: job.customEnrichmentPrompt || undefined,
       };
 
       console.log(
-        `Processing ${job.scrape_type} job ${job.id} for ${job.source_url}`,
+        `Processing ${job.scrapeType} job ${job.id} for ${job.sourceUrl}`,
       );
       await ragService.processJob(jobPayload);
       await this.markJobAsCompleted(job.id);
@@ -538,16 +545,20 @@ class JobService {
    * Get the latest job ID for a library.
    */
   async getLatestJobForLibrary(libraryId: string) {
-    const { rows } = await pool.query(
-      'SELECT job_id FROM embedding_jobs WHERE library_id = $1 ORDER BY created_at DESC LIMIT 1',
-      [libraryId],
-    );
+    const rows = await db
+      .select({
+        jobId: embeddingJobs.jobId,
+      })
+      .from(embeddingJobs)
+      .where(eq(embeddingJobs.libraryId, libraryId))
+      .orderBy(desc(embeddingJobs.createdAt))
+      .limit(1);
 
     if (rows.length === 0) {
       return { jobId: null };
     }
 
-    return { jobId: rows[0].job_id };
+    return { jobId: rows[0].jobId };
   }
 
   /**
