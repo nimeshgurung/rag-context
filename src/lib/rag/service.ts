@@ -5,7 +5,9 @@ import { EnrichedItem } from '../types';
 import { getEnrichedDataFromLLM } from '../ai/enrichment';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { createHash } from 'crypto';
-import pool from '../db';
+import { db } from '../db';
+import { libraries, embeddings } from '../db/schema';
+import { sql } from 'drizzle-orm';
 import { analyzeMarkdownHeaders } from '../ai/service';
 
 if (!process.env.POSTGRES_CONNECTION_STRING) {
@@ -52,22 +54,23 @@ class RagService {
       value: `${library.name}: ${library.description}`,
     });
 
-    // Use direct SQL query instead of PgVector upsert
-    await pool.query(
-      `INSERT INTO libraries (id, name, description, embedding)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (id)
-       DO UPDATE SET
-         name = EXCLUDED.name,
-         description = EXCLUDED.description,
-         embedding = EXCLUDED.embedding`,
-      [
-        library.id,
-        library.name,
-        library.description,
-        JSON.stringify(embedding),
-      ],
-    );
+    // Use Drizzle's upsert with proper vector handling
+    await db
+      .insert(libraries)
+      .values({
+        id: library.id,
+        name: library.name,
+        description: library.description,
+        embedding: embedding, // Drizzle handles vector serialization
+      })
+      .onConflictDoUpdate({
+        target: libraries.id,
+        set: {
+          name: library.name,
+          description: library.description,
+          embedding: embedding,
+        },
+      });
   }
 
   /**
@@ -156,39 +159,37 @@ class RagService {
     );
 
     // Create embeddings for the processed chunks
-    const { embeddings } = await embedMany({
+    const { embeddings: embeddingVectors } = await embedMany({
       model: models['text-embedding-3-small'],
       values: allChunks,
     });
 
-    // Insert embeddings using direct SQL
-    for (let i = 0; i < allChunks.length; i++) {
-      const chunk = allChunks[i];
-      const embedding = embeddings[i];
-      const vectorId = this.generateDeterministicId(
+    // Prepare batch data for efficient insert
+    const embeddingData = allChunks.map((chunk, i) => ({
+      vectorId: this.generateDeterministicId(
         job.libraryId,
         job.sourceUrl,
         chunk,
-      );
+      ),
+      libraryId: job.libraryId,
+      contentType: 'documentation' as const,
+      title: null,
+      originalText: chunk,
+      sourceUrl: job.sourceUrl,
+      embedding: embeddingVectors[i],
+    }));
 
-      await pool.query(
-        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (vector_id)
-         DO UPDATE SET
-           original_text = EXCLUDED.original_text,
-           embedding = EXCLUDED.embedding`,
-        [
-          vectorId,
-          job.libraryId,
-          'documentation',
-          null, // title
-          chunk,
-          job.sourceUrl,
-          JSON.stringify(embedding),
-        ],
-      );
-    }
+    // Batch upsert - much more efficient than individual inserts
+    await db
+      .insert(embeddings)
+      .values(embeddingData)
+      .onConflictDoUpdate({
+        target: embeddings.vectorId,
+        set: {
+          originalText: sql.raw(`excluded.${embeddings.originalText.name}`),
+          embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
+        },
+      });
 
     console.log(
       `Successfully ingested ${allChunks.length} documentation chunks for ${job.sourceUrl}`,
@@ -230,40 +231,38 @@ class RagService {
       description: job.libraryDescription,
     });
 
-    const { embeddings } = await embedMany({
+    const { embeddings: embeddingVectors } = await embedMany({
       model: models['text-embedding-3-small'],
       values: enrichedItems.map((item) => item.code),
     });
 
-    // Insert embeddings using direct SQL
-    for (let i = 0; i < enrichedItems.length; i++) {
-      const item = enrichedItems[i];
-      const embedding = embeddings[i];
-      const vectorId = this.generateDeterministicId(
+    // Prepare batch data for efficient insert
+    const embeddingData = enrichedItems.map((item, i) => ({
+      vectorId: this.generateDeterministicId(
         job.libraryId,
         job.sourceUrl,
         item.code,
-      );
+      ),
+      libraryId: job.libraryId,
+      contentType: 'code-example' as const,
+      title: item.title,
+      originalText: item.code,
+      sourceUrl: job.sourceUrl,
+      embedding: embeddingVectors[i],
+    }));
 
-      await pool.query(
-        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (vector_id)
-         DO UPDATE SET
-           title = EXCLUDED.title,
-           original_text = EXCLUDED.original_text,
-           embedding = EXCLUDED.embedding`,
-        [
-          vectorId,
-          job.libraryId,
-          'code-example',
-          item.title,
-          item.code,
-          job.sourceUrl,
-          JSON.stringify(embedding),
-        ],
-      );
-    }
+    // Batch upsert - much more efficient than individual inserts
+    await db
+      .insert(embeddings)
+      .values(embeddingData)
+      .onConflictDoUpdate({
+        target: embeddings.vectorId,
+        set: {
+          title: sql.raw(`excluded.${embeddings.title.name}`),
+          originalText: sql.raw(`excluded.${embeddings.originalText.name}`),
+          embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
+        },
+      });
   }
 
   /**
@@ -290,35 +289,34 @@ class RagService {
     });
 
     const texts = items.map((item) => item.text);
-    const { embeddings } = await embedMany({
+    const { embeddings: embeddingVectors } = await embedMany({
       model: models['text-embedding-3-small'],
       values: texts,
     });
 
-    // Insert embeddings using direct SQL
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const embedding = embeddings[i];
+    // Prepare batch data for efficient insert
+    const embeddingData = items.map((item, i) => ({
+      vectorId: item.id,
+      libraryId: libraryInfo.libraryId,
+      contentType: 'api-spec' as const,
+      title: (item.metadata.title as string) || null,
+      originalText: item.text,
+      sourceUrl: sourceUrl,
+      embedding: embeddingVectors[i],
+    }));
 
-      await pool.query(
-        `INSERT INTO embeddings (vector_id, library_id, content_type, title, original_text, source_url, embedding)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         ON CONFLICT (vector_id)
-         DO UPDATE SET
-           title = EXCLUDED.title,
-           original_text = EXCLUDED.original_text,
-           embedding = EXCLUDED.embedding`,
-        [
-          item.id,
-          libraryInfo.libraryId,
-          'api-spec',
-          item.metadata.title || null,
-          item.text,
-          sourceUrl,
-          JSON.stringify(embedding),
-        ],
-      );
-    }
+    // Batch upsert - much more efficient than individual inserts
+    await db
+      .insert(embeddings)
+      .values(embeddingData)
+      .onConflictDoUpdate({
+        target: embeddings.vectorId,
+        set: {
+          title: sql.raw(`excluded.${embeddings.title.name}`),
+          originalText: sql.raw(`excluded.${embeddings.originalText.name}`),
+          embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
+        },
+      });
   }
 
   /**
