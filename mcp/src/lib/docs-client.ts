@@ -10,7 +10,7 @@ interface SearchResponse {
   error?: string;
 }
 
-class BackendClient {
+class DocsClient {
   private baseUrl: string;
 
   constructor(baseUrl: string = 'http://localhost:3001') {
@@ -44,7 +44,7 @@ class BackendClient {
 
   async fetchLibraryDocumentation(
     libraryId: string,
-    options: { topic?: string; tokens?: number } = {}
+    options: { topic?: string; tokens?: number } = {},
   ): Promise<string> {
     try {
       const response = await fetch(`${this.baseUrl}/api/docs`, {
@@ -75,6 +75,6 @@ class BackendClient {
 }
 
 // Create a singleton instance
-const backendClient = new BackendClient(process.env.BACKEND_URL);
+const docsClient = new DocsClient(process.env.BACKEND_URL);
 
-export { backendClient, type LibrarySearchResult, type SearchResponse };
+export { docsClient, type LibrarySearchResult, type SearchResponse };

@@ -7,11 +7,9 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "dev:mastra": "tsx src/mastra-server.ts",
-    "dev:generic": "tsx src/generic-server.ts",
+    "dev:mcp": "tsx src/server.ts",
     "build": "tsc",
-    "start:mastra": "node dist/mastra-server.js",
-    "start:generic": "node dist/generic-server.js",
+    "start:mcp": "node dist/server.js",
     "lint": "eslint .",
     "format": "prettier --write 'src/**/*.ts'"
   },
