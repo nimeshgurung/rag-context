@@ -1,5 +1,5 @@
 import { db } from '../db';
-import { libraries, embeddings, embeddingJobs } from '../db/schema';
+import { libraries, embeddings, embeddingJobs } from '../schema.js';
 import { asc, eq } from 'drizzle-orm';
 import { LibrarySearchResult } from '../types';
 

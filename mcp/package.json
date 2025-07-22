@@ -1,0 +1,38 @@
+{
+  "name": "rag-context-mcp",
+  "version": "1.0.0",
+  "main": "dist/mastra-server.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev:mcp": "tsx src/server.ts",
+    "build": "tsc",
+    "start:mcp": "node dist/server.js",
+    "lint": "eslint .",
+    "format": "prettier --write 'src/**/*.ts'"
+  },
+  "dependencies": {
+    "@mastra/core": "^0.10.6",
+    "@modelcontextprotocol/sdk": "^1.12.3",
+    "commander": "^14.0.0",
+    "dotenv": "^16.5.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@types/commander": "^2.12.0",
+    "@types/node": "^24.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.34.1",
+    "@typescript-eslint/parser": "^8.34.1",
+    "eslint": "^9.29.0",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.0",
+    "globals": "^16.2.0",
+    "mastra": "^0.10.6",
+    "prettier": "^3.5.3",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.1"
+  }
+}

@@ -5,8 +5,8 @@ import { useDialog } from '../context/DialogProvider';
 import { useJobProgress } from './useJobProgress';
 import { useApiSpecForm } from './useApiSpecForm';
 import { useWebScrapeForm } from './useWebScrapeForm';
-import type { ApiSpecSource, WebScrapeSource } from '../../../src/lib/types';
-import usePrevious from 'use-previous';
+import type { ApiSpecSource, WebScrapeSource } from 'backend/src/lib/types';
+import { usePrevious } from '@uidotdev/usehooks';
 
 interface ExistingLibrary {
   id: string;

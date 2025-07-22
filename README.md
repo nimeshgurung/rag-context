@@ -1,162 +1,86 @@
-# RAG Context System
+# RAG Context - Documentation Processing System
 
-A comprehensive documentation and code snippet management system that crawls, processes, and stores library documentation for RAG (Retrieval Augmented Generation) applications.
+A full-stack application for processing and searching documentation using RAG (Retrieval-Augmented Generation) techniques.
 
-## Data Flow Architecture
+## Quick Start
 
-The system uses a **two-phase approach** to handle large documentation pages efficiently:
-
-### Phase 1: Fast Crawling & Content Extraction (No Timeouts)
-
-**Entry Point**: `src/lib/jobs/service.ts::startCrawlJob()`
-- Creates a unique job ID (UUID)
-- Generates library ID from library name (slugified)
-- Initializes library metadata in PgVector `libraries` index
-- Starts background crawling process
-
-**Crawling Logic**: `src/lib/crawl/`
-- **Documentation Crawling** (`documentationCrawler.ts`):
-  - Uses Playwright to crawl documentation pages
-  - Extracts readable content using Mozilla Readability
-  - Converts HTML to Markdown using Turndown
-  - **NEW**: Stores raw markdown directly (no LLM processing)
-  - Fast and lightweight - won't timeout on large pages
-
-- **Code Crawling** (`crawler.ts`):
-  - Uses Playwright to crawl code example pages
-  - Extracts code snippets using CSS selectors (`pre > code` by default)
-  - Captures surrounding context as markdown
-  - Raw snippets = code blocks
-
-**Temporary Storage**: PostgreSQL `embedding_jobs` table
-- **Documentation jobs**: Raw markdown stored in `context_markdown` column
-- **Code jobs**: Raw snippets stored in `raw_snippets` JSONB column
-- Each job contains:
-  - `job_id`: Batch identifier
-  - `library_id`: Target library
-  - `source_url`: Original URL
-  - `context_markdown`: Raw markdown (documentation)
-  - `raw_snippets`: Array of code snippets (code)
-  - `scrape_type`: 'documentation' or 'code'
-  - `status`: 'pending', 'processing', 'completed', 'failed'
-
-### Phase 2: On-Demand Processing & Enrichment (LLM-Intensive)
-
-**Trigger**: User decides when to process (via UI or CLI)
-**Worker Process**: `src/lib/jobs/processQueue.ts`
-- Fetches pending jobs from queue
-- Processes jobs through `ragService.processJob()`
-- **For Documentation**:
-  - Splits raw markdown using MarkdownHeaderTextSplitter
-  - LLM semantic extraction via `extractSemanticChunksFromMarkdown()`
-  - Converts to structured chunks with titles and descriptions
-- **For Code**: LLM enrichment via `getEnrichedDataFromLLM()`
-  - Adds titles, descriptions, language detection
-  - Enhances raw code with context and metadata
-
-**Manual Processing Commands**:
-```bash
-# Process specific crawl batch
-npm run trigger-processing abc-123-def-456
-
-# Process all pending jobs
-npm run trigger-processing --all
-
-# Process latest jobs for a library
-npm run trigger-processing --library react-docs
-```
-
-### Benefits of Two-Phase Approach
-
-✅ **No More Timeouts**: Crawling phase is fast and won't timeout on large documentation pages
-✅ **On-Demand Processing**: Users control when expensive LLM processing happens
-✅ **Fault Tolerance**: Failed processing doesn't require re-crawling
-✅ **Better Resource Management**: Separate lightweight crawling from heavy processing
-✅ **Batch Control**: Process specific libraries or job batches as needed
-
-### Final Storage (Vector Embeddings)
-
-**Storage Location**: PgVector `embeddings` index
-- **Libraries Index**:
-  - Stores library metadata with embeddings
-  - Used for initial library search
-- **Embeddings Index**:
-  - Stores processed snippets as vector embeddings
-  - Each embedding contains:
-    - `library_id`: Source library
-    - `original_text`: The actual content
-    - `content_type`: 'documentation', 'code-example', etc.
-    - `source`: Original URL
-    - Additional metadata (title, description, language)
-
-### Retrieval & Search
-
-**Search Process**: `src/lib/rag/service.ts`
-1. **Library Search**: `searchLibraries()` - Find relevant libraries
-2. **Documentation Retrieval**: `fetchLibraryDocumentation()` - Get specific content
-3. Vector similarity search within library context
-4. Returns formatted results for LLM consumption
-
-## Key Components
-
-### Database Schema
-```sql
--- Job queue storage
-embedding_jobs (
-  id SERIAL PRIMARY KEY,
-  job_id UUID,
-  library_id TEXT,
-  source_url TEXT,
-  raw_snippets JSONB,  -- Raw extracted content
-  scrape_type TEXT,
-  status VARCHAR(20),
-  context_markdown TEXT
-)
-
--- Vector storage (PgVector)
-libraries index     -- Library metadata embeddings
-embeddings index    -- Content embeddings with metadata
-```
-
-### Processing Flow
-```
-URL → Crawl → Extract → Store in Jobs Table → Process → Enrich → Embed → Store in Vector DB
-```
-
-### API Endpoints
-- `POST /api/libraries` - Create new library and start crawling
-- `GET /api/libraries` - List all libraries
-- `GET /api/libraries/:id/documentation` - Retrieve library documentation
-- `DELETE /api/libraries/:id` - Delete library and all associated data
-
-## Development
+### Prerequisites
+- Node.js >= 20.9.0
+- PostgreSQL database
 
 ### Setup
+1. **Install all dependencies:**
+   ```bash
+   npm run install:all
+   ```
+
+2. **Set up environment variables:**
+   - Copy `backend/.env.example` to `backend/.env`
+   - Configure your database and API keys
+
+3. **Set up database:**
+   ```bash
+   cd backend
+   npm run db:migrate
+   ```
+
+4. **Install Playwright browsers (for web scraping):**
+   ```bash
+   npm run playwright:setup
+   ```
+   > Note: This happens automatically during `npm install` in the backend, but run manually if needed.
+
+### Development
 ```bash
-npm install
-npm run db:setup  # Creates tables and indexes
-npm run dev       # Starts development server
+# Start both backend and frontend in development mode
+npm run dev
+
+# Or run individually:
+npm run backend:dev
+npm run frontend:dev
+npm run mcp:dev:mastra  # MCP server for Mastra integration
+npm run mcp:dev:generic # Generic MCP server
 ```
 
-### Environment Variables
+### Production Build
 ```bash
-POSTGRES_CONNECTION_STRING=postgresql://...
-OPENAI_API_KEY=sk-...
+npm run build
 ```
 
-### Processing Jobs
-```bash
-# Process all pending jobs
-npm run process-all
+## Architecture
 
-# Process specific job batch
-npm run process-all <job-id>
+This is a monorepo with three main packages:
+
+- **`backend/`** - Express.js API server with document processing
+- **`frontend/`** - React/TypeScript UI for managing documentation
+- **`mcp/`** - MCP (Model Context Protocol) servers for AI integrations
+
+## Features
+
+- **Document Ingestion**: Process API specs and web content
+- **Web Scraping**: Extract documentation from websites using Playwright
+- **Job Processing**: Queue-based background processing
+- **Library Management**: Organize documentation into searchable libraries
+- **MCP Integration**: AI assistant integrations via Model Context Protocol
+
+## Troubleshooting
+
+### Playwright Browser Issues
+If you get browser launch errors:
+```bash
+npm run playwright:setup
 ```
 
-## Architecture Benefits
+### Type Import Errors
+The frontend imports types from the backend package. If you get import errors, ensure dependencies are properly installed:
+```bash
+npm run install:all
+```
 
-1. **Scalable Processing**: Jobs are queued and processed asynchronously
-2. **Content Deduplication**: Deterministic IDs prevent duplicate content
-3. **Flexible Enrichment**: Custom prompts for different content types
-4. **Efficient Search**: Vector similarity search with library filtering
-5. **Robust Error Handling**: Failed jobs are tracked and can be retried
+### Database Issues
+Reset and recreate the database:
+```bash
+cd backend
+npm run db:clear
+npm run db:migrate
+```

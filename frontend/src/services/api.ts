@@ -1,4 +1,4 @@
-import type { DocumentationSource } from '../../../src/lib/types';
+import type { DocumentationSource } from 'backend/src/lib/types';
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
