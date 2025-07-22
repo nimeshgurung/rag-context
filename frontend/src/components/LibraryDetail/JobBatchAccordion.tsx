@@ -85,6 +85,16 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
     }
   }, [isExpanded, fetchStatus]);
 
+  // Add polling while processing
+  useEffect(() => {
+    if (!isExpanded || !isProcessing) return;
+
+    const interval = 2000; // Poll every 2 seconds while processing
+    const pollInterval = setInterval(fetchStatus, interval);
+
+    return () => clearInterval(pollInterval);
+  }, [isExpanded, isProcessing, fetchStatus]);
+
   const handleDelete = async (jobItemId: number) => {
     showConfirm(
       'Confirm Deletion',
