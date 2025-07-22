@@ -6,8 +6,8 @@ import { getEnrichedDataFromLLM } from '../ai/enrichment';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { createHash } from 'crypto';
 import { db } from '../db';
-import { libraries, embeddings } from '../db/schema';
-import { sql } from 'drizzle-orm';
+import { libraries, embeddings } from '../schema.js';
+import { sql, and, eq } from 'drizzle-orm';
 import { analyzeMarkdownHeaders } from '../ai/service';
 
 if (!process.env.POSTGRES_CONNECTION_STRING) {
@@ -37,6 +37,37 @@ class RagService {
   ): string {
     const input = `${libraryId}-${sourceUrl}-${content}`;
     return createHash('sha256').update(input).digest('hex');
+  }
+
+  /**
+   * Deletes all existing embeddings for a specific source URL in a library.
+   * This prevents duplicates when reprocessing the same URL with new content.
+   * @param libraryId - The ID of the library.
+   * @param sourceUrl - The URL of the source document.
+   */
+  private async deleteExistingEmbeddings(
+    libraryId: string,
+    sourceUrl: string,
+  ): Promise<void> {
+    const result = await db
+      .delete(embeddings)
+      .where(
+        and(
+          eq(embeddings.libraryId, libraryId),
+          eq(embeddings.sourceUrl, sourceUrl),
+        ),
+      );
+
+    const deletedCount = result.rowCount || 0;
+    if (deletedCount > 0) {
+      console.log(
+        `Cleaned up ${deletedCount} existing embeddings for ${sourceUrl}`,
+      );
+    } else {
+      console.log(
+        `No existing embeddings found for ${sourceUrl} (first time processing)`,
+      );
+    }
   }
 
   /**
@@ -84,6 +115,9 @@ class RagService {
       console.log('No raw markdown to process');
       return;
     }
+
+    // Clean up existing embeddings for this URL to prevent duplicates
+    await this.deleteExistingEmbeddings(job.libraryId, job.sourceUrl);
 
     // Import the processing modules here (lazy loading)
     const { extractSemanticChunksFromMarkdown } = await import(
@@ -208,6 +242,9 @@ class RagService {
       return;
     }
 
+    // Clean up existing embeddings for this URL to prevent duplicates
+    await this.deleteExistingEmbeddings(job.libraryId, job.sourceUrl);
+
     // Enrich raw snippets with LLM
     const enrichedItems: EnrichedItem[] = [];
     for (const snippet of job.rawSnippets) {
@@ -282,6 +319,9 @@ class RagService {
     items: { id: string; text: string; metadata: Record<string, unknown> }[],
     sourceUrl: string,
   ) {
+    // Clean up existing embeddings for this URL to prevent duplicates
+    await this.deleteExistingEmbeddings(libraryInfo.libraryId, sourceUrl);
+
     await this.upsertLibrary({
       id: libraryInfo.libraryId,
       name: libraryInfo.libraryName,

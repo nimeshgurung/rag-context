@@ -2,8 +2,8 @@ import { MCPServer } from '@mastra/mcp';
 import 'dotenv/config';
 import { z } from 'zod';
 import { createTool } from '@mastra/core';
-import { searchLibraries, fetchLibraryDocumentation } from './lib/api';
-import { formatSearchResults } from './lib/utils';
+import { docsClient } from './lib/docs-client';
+import { formatSearchResults } from './lib/utils.js';
 import { program } from 'commander';
 import http from 'http';
 
@@ -26,7 +26,7 @@ const getLibraryDocsInput = z.object({
 });
 
 const server = new MCPServer({
-  name: 'rag-context-server',
+  name: 'ubs-docs',
   version: '0.1.0',
   description: 'A server to answer questions about internal libraries.',
   tools: {
@@ -39,8 +39,8 @@ const server = new MCPServer({
         .string()
         .describe('A formatted string of search results.'),
       execute: async ({ context }) => {
-        const results = await searchLibraries(context.libraryName);
-        return formatSearchResults({ results });
+        const results = await docsClient.searchLibraries(context.libraryName);
+        return formatSearchResults(results);
       },
     }),
     'get-library-docs': createTool({
@@ -55,7 +55,7 @@ const server = new MCPServer({
         ),
       execute: async ({ context }) => {
         const { libraryId, topic, tokens } = context;
-        return fetchLibraryDocumentation(libraryId, {
+        return docsClient.fetchLibraryDocumentation(libraryId, {
           topic,
           tokens,
         });

@@ -3,7 +3,7 @@ import { models } from '../ai/models';
 import { db } from '../db';
 import { sql, eq } from 'drizzle-orm';
 import { LibrarySearchResult } from '../types';
-import { embeddings } from '../db/schema';
+import { embeddings } from '../schema.js';
 
 // Type for the library search query result from stored procedure
 interface LibrarySearchRow {
