@@ -17,7 +17,9 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:clear": "tsx scripts/clear-db.ts",
-    "trigger-processing": "tsx scripts/trigger-processing.ts"
+    "trigger-processing": "tsx scripts/trigger-processing.ts",
+    "playwright:install": "playwright install --with-deps chromium",
+    "postinstall": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "@ai-sdk/groq": "^1.2.9",

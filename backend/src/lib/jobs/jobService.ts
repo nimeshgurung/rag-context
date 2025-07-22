@@ -5,7 +5,7 @@ import { spawn } from 'child_process';
 import PQueue from 'p-queue';
 import { db } from '../db';
 import { embeddingJobs } from '../schema.js';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, inArray } from 'drizzle-orm';
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
@@ -239,11 +239,13 @@ class JobService {
 
         if (jobs.length > 0) {
           const jobIds = jobs.map((j) => j.id);
-          await tx.execute(sql`
-            UPDATE embedding_jobs
-            SET status = 'processing', processed_at = NOW()
-            WHERE id = ANY(${jobIds}::int[])
-          `);
+          await tx
+            .update(embeddingJobs)
+            .set({
+              status: 'processing',
+              processedAt: new Date(),
+            })
+            .where(inArray(embeddingJobs.id, jobIds));
         }
 
         return jobs;
@@ -502,7 +504,7 @@ class JobService {
   async processAllJobs(jobId: string) {
     try {
       const workerCommand = 'npm';
-      const workerArgs = ['run', 'process-all', '--', jobId];
+      const workerArgs = ['run', 'trigger-processing', '--', jobId];
 
       console.log(
         `Spawning worker for jobId: ${jobId} with command: ${workerCommand} ${workerArgs.join(' ')}`,

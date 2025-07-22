@@ -9,14 +9,14 @@
     "backend:dev": "cd backend && npm run dev",
     "backend:build": "cd backend && npm run build",
     "backend:start": "cd backend && npm run start",
-    "mcp:dev:mastra": "cd mcp && npm run dev:mastra",
-    "mcp:dev:generic": "cd mcp && npm run dev:generic",
+    "mcp:dev": "cd mcp && npm run start:mcp",
     "mcp:build": "cd mcp && npm run build",
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build",
     "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
     "build": "npm run backend:build && npm run mcp:build && npm run frontend:build",
     "install:all": "npm install && cd backend && npm install && cd ../mcp && npm install && cd ../frontend && npm install",
+    "playwright:setup": "cd backend && npm run playwright:install",
     "lint": "cd backend && npm run lint && cd ../mcp && npm run lint && cd ../frontend && npm run lint",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -25,7 +25,7 @@
   },
   "workspaces": [
     "backend",
-    "mcp", 
+    "mcp",
     "frontend"
   ]
 }
