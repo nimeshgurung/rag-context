@@ -49,7 +49,7 @@ class RagService {
     libraryId: string,
     sourceUrl: string,
   ): Promise<void> {
-    await db
+    const result = await db
       .delete(embeddings)
       .where(
         and(
@@ -58,7 +58,16 @@ class RagService {
         ),
       );
 
-    console.log(`Cleaned up existing embeddings for ${sourceUrl}`);
+    const deletedCount = result.rowCount || 0;
+    if (deletedCount > 0) {
+      console.log(
+        `Cleaned up ${deletedCount} existing embeddings for ${sourceUrl}`,
+      );
+    } else {
+      console.log(
+        `No existing embeddings found for ${sourceUrl} (first time processing)`,
+      );
+    }
   }
 
   /**
