@@ -1,0 +1,63 @@
+import React from 'react';
+import { TableRow, TableCell, Checkbox, Typography, Chip, Box, IconButton } from '@mui/material';
+import { PlayArrow, Delete } from '@mui/icons-material';
+import { StatusChip } from './StatusChip';
+import type { JobItem } from '../../../types';
+
+interface JobRowProps {
+  job: JobItem;
+  isSelected: boolean;
+  isProcessing: boolean;
+  onToggleSelection: () => void;
+  onProcess: () => void;
+  onDelete: () => void;
+}
+
+export const JobRow: React.FC<JobRowProps> = ({
+  job,
+  isSelected,
+  isProcessing,
+  onToggleSelection,
+  onProcess,
+  onDelete,
+}) => (
+  <TableRow hover>
+    <TableCell padding="checkbox">
+      <Checkbox checked={isSelected} onChange={onToggleSelection} />
+    </TableCell>
+    <TableCell>
+      <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+        {job.sourceUrl}
+      </Typography>
+    </TableCell>
+    <TableCell>
+      <Chip label={job.scrapeType} size="small" variant="outlined" />
+    </TableCell>
+    <TableCell>
+      <StatusChip status={job.status} />
+    </TableCell>
+    <TableCell>
+      <Box sx={{ display: 'flex', gap: 0.5 }}>
+        {job.status === 'pending' && (
+          <IconButton
+            size="small"
+            onClick={onProcess}
+            disabled={isProcessing}
+            title="Process"
+          >
+            <PlayArrow fontSize="small" />
+          </IconButton>
+        )}
+        <IconButton
+          size="small"
+          onClick={onDelete}
+          disabled={isProcessing}
+          title="Delete"
+          color="error"
+        >
+          <Delete fontSize="small" />
+        </IconButton>
+      </Box>
+    </TableCell>
+  </TableRow>
+);

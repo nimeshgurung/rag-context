@@ -4,7 +4,7 @@ import {
   Alert,
   CircularProgress,
 } from '@mui/material';
-import JobBatchAccordion from './JobBatchAccordion';
+import { JobBatchAccordion } from './jobs';
 import { useLibraryJobs } from '../../hooks/queries/useLibraryJobs';
 
 interface JobsTabProps {
