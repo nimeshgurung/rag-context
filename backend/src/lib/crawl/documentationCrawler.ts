@@ -1,17 +1,9 @@
 import { PlaywrightCrawler, Configuration } from 'crawlee';
-import TurndownService from 'turndown';
-import { Readability } from '@mozilla/readability';
-import { JSDOM } from 'jsdom';
 import { WebScrapeSource } from '../types';
 import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { getScopeGlob } from './utils';
-
-const turndownService = new TurndownService({
-  codeBlockStyle: 'fenced',
-  headingStyle: 'atx',
-});
 
 export async function crawlDocumentation(
   jobId: string,
@@ -31,44 +23,34 @@ export async function crawlDocumentation(
     {
       maxRequestsPerCrawl: 1000,
       maxConcurrency: 1,
-      async requestHandler({ request, page, enqueueLinks, log }) {
-        log.info(`[Job ${jobId}] Processing documentation: ${request.url}`);
+      async requestHandler({ request, enqueueLinks, log }) {
+        log.info(`[Job ${jobId}] Discovering URL: ${request.url}`);
         sendEvent(jobId, {
           type: 'progress',
-          message: `Crawling documentation: ${request.url}`,
+          message: `Discovering documentation page: ${request.url}`,
         });
 
-        const html = await page.content();
-        const dom = new JSDOM(html, { url: request.url });
-        const reader = new Readability(dom.window.document);
-        const article = reader.parse();
+        // Phase 1: Just discover URLs - NO content extraction
+        // We'll fetch fresh content during processing phase
 
-        if (!article || !article.content) {
-          log.warning(`No readable content found on ${request.url}. Skipping.`);
-          return;
-        }
-
-        // Phase 1: Just convert to markdown and store - NO expensive LLM processing
-        const markdown = turndownService.turndown(article.content);
-
-        // Create job with raw markdown - we'll process it in phase 2
+        // Create a minimal job entry with just the URL
         const job: EmbeddingJobPayload = {
           jobId,
           libraryId,
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          rawSnippets: [], // Empty for now - will be populated in phase 2
-          contextMarkdown: markdown, // Store the raw markdown here
+          rawSnippets: [], // Empty - will be populated during processing
+          contextMarkdown: undefined, // No markdown stored anymore
           scrapeType: 'documentation',
+          customEnrichmentPrompt: source.config.customEnrichmentPrompt,
         };
 
-        // Always enqueue the job with raw markdown
+        // Enqueue the URL for later processing
         await enqueueEmbeddingJobs([job]);
-        log.info(
-          `Enqueued raw markdown for ${request.url} (${markdown.length} characters)`,
-        );
+        log.info(`Enqueued URL for later processing: ${request.url}`);
 
+        // Continue crawling to discover more URLs
         await enqueueLinks({
           selector: 'a',
           globs: [scopeGlob],
@@ -76,13 +58,12 @@ export async function crawlDocumentation(
         });
       },
       failedRequestHandler({ request, log }, error) {
-        log.error(
-          `[Job ${jobId}] Request ${request.url} failed and will not be retried.`,
-          { error },
-        );
+        log.error(`[Job ${jobId}] Failed to discover URL ${request.url}`, {
+          error,
+        });
         sendEvent(jobId, {
           type: 'progress',
-          message: `Failed to crawl: ${request.url}. Reason: ${error.message}`,
+          message: `Failed to discover: ${request.url}. Reason: ${error.message}`,
         });
       },
     },
@@ -90,10 +71,10 @@ export async function crawlDocumentation(
   );
 
   console.log(
-    `[Job ${jobId}] Starting documentation crawl for ${libraryId} at ${startUrl}...`,
+    `[Job ${jobId}] Starting URL discovery for ${libraryId} at ${startUrl}...`,
   );
   await crawler.run([startUrl]);
   console.log(
-    `[Job ${jobId}] Documentation crawl for ${libraryId} finished successfully.`,
+    `[Job ${jobId}] URL discovery for ${libraryId} finished successfully.`,
   );
 }

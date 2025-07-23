@@ -60,7 +60,7 @@ export async function fetchLibraryDocumentation(
   libraryId: string,
   topic?: string,
 ): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/docs`, {
+  const response = await fetch(`${API_BASE_URL}/documentation`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -106,7 +106,7 @@ export async function getCrawlJobStatus(
 }
 
 export async function deleteJob(jobItemId: number) {
-  const response = await fetch(`${API_BASE_URL}/crawl/job/${jobItemId}`, {
+  const response = await fetch(`${API_BASE_URL}/jobs/job/${jobItemId}`, {
     method: 'DELETE',
   });
   return response.json();
@@ -124,7 +124,7 @@ export async function processSingleJob(jobItemId: number) {
 }
 
 export async function processAllJobs(jobId: string) {
-  const response = await fetch(`${API_BASE_URL}/crawl/process/all/${jobId}`, {
+  const response = await fetch(`${API_BASE_URL}/jobs/process/all/${jobId}`, {
     method: 'POST',
   });
   return response.json();

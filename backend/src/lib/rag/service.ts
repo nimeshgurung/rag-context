@@ -360,31 +360,66 @@ class RagService {
   }
 
   /**
-   * Processes a job by determining its type and calling the appropriate ingestion method.
-   * This method encapsulates all the business logic for handling different job types.
-   * @param job - The embedding job to process
+   * Extracts code snippets from markdown content.
+   * Used for code-type jobs where we fetch markdown and need to extract code blocks.
+   */
+  private extractCodeSnippetsFromMarkdown(markdown: string): string[] {
+    const codeBlockRegex = /```[\s\S]*?```/g;
+    const matches = markdown.match(codeBlockRegex) || [];
+
+    return matches
+      .map((block) => {
+        // Remove the ``` markers and language identifier
+        const lines = block.split('\n');
+        // Remove first line (```language) and last line (```)
+        return lines.slice(1, -1).join('\n');
+      })
+      .filter((snippet) => snippet.trim().length > 0);
+  }
+
+  /**
+   * Process an embedding job. Routes to appropriate handler based on scrapeType.
+   * Now handles both documentation and code jobs with markdown content.
    */
   async processJob(job: EmbeddingJobPayload): Promise<void> {
     console.log(`Processing ${job.scrapeType} job for ${job.sourceUrl}`);
 
+    // Ensure we have markdown content for both job types
+    if (!job.contextMarkdown || job.contextMarkdown.trim().length === 0) {
+      console.log(`Job has no markdown content, skipping processing.`);
+      return;
+    }
+
     switch (job.scrapeType) {
       case 'documentation':
-        // Documentation jobs use contextMarkdown
-        if (!job.contextMarkdown || job.contextMarkdown.trim().length === 0) {
+        // Documentation jobs process markdown directly
+        await this.ingestDocumentation(job);
+        break;
+
+      case 'code':
+        // Code jobs need to extract snippets from markdown first
+        const codeSnippets = this.extractCodeSnippetsFromMarkdown(
+          job.contextMarkdown,
+        );
+
+        if (codeSnippets.length === 0) {
           console.log(
-            `Documentation job has no markdown content, skipping processing.`,
+            `No code snippets found in markdown, skipping processing.`,
           );
           return;
         }
-        await this.ingestDocumentation(job);
+
+        // Update job with extracted snippets
+        const codeJob = {
+          ...job,
+          rawSnippets: codeSnippets,
+        };
+
+        await this.ingestCodeSnippets(codeJob);
         break;
+
       default:
-        // Code jobs use rawSnippets
-        if (!job.rawSnippets || job.rawSnippets.length === 0) {
-          console.log(`Code job has no snippets, skipping processing.`);
-          return;
-        }
-        await this.ingestCodeSnippets(job);
+        console.warn(`Unknown scrape type: ${job.scrapeType}`);
     }
   }
 }

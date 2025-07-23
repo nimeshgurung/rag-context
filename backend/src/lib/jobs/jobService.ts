@@ -9,6 +9,10 @@ import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
 import { sendEvent, closeConnection } from '../events';
+import {
+  fetchMarkdownForUrl,
+  fetchCodeSnippetsForUrl,
+} from '../crawl/contentFetcher';
 
 // Type for the raw embedding job row from database
 interface EmbeddingJobRow extends Record<string, unknown> {
@@ -267,37 +271,124 @@ class JobService {
   }
 
   /**
-   * Mark a job as failed with error message.
+   * Mark a job as failed with error details and type.
+   * @param jobId - The job ID to mark as failed
+   * @param errorMessage - The error message
+   * @param errorType - Type of error: 'fetch' or 'processing'
    */
   private async markJobAsFailed(
     jobId: number,
     errorMessage: string,
-  ): Promise<void> {
+    errorType: 'fetch' | 'processing' = 'processing',
+  ) {
     await db
       .update(embeddingJobs)
       .set({
         status: 'failed',
-        errorMessage: errorMessage,
+        errorMessage: `[${errorType}] ${errorMessage}`,
+        updatedAt: new Date(),
       })
       .where(eq(embeddingJobs.id, jobId));
   }
 
   /**
-   * Process a single job by calling the appropriate RAG service method.
+   * Mark a job as processing.
+   */
+  private async markJobAsProcessing(jobId: number) {
+    await db
+      .update(embeddingJobs)
+      .set({
+        status: 'processing',
+        updatedAt: new Date(),
+      })
+      .where(eq(embeddingJobs.id, jobId));
+  }
+
+  /**
+   * Process a job from the queue by fetching fresh content.
+   * This is used by the batch processing queue.
    */
   private async processJob(
     job: EmbeddingJobPayload & { id: number },
   ): Promise<void> {
-    await ragService.processJob(job);
-    await this.markJobAsCompleted(job.id);
-    console.log(`Job ${job.id} completed successfully.`);
+    let isFetchError = false;
 
-    // Send progress event for this completed job
-    if (job.jobId) {
-      sendEvent(job.jobId, {
-        type: 'progress',
-        message: `Completed processing: ${job.sourceUrl}`,
-      });
+    try {
+      // Update status to processing
+      await this.markJobAsProcessing(job.id);
+
+      // Fetch fresh content from the URL based on scrape type
+      let fetchResult;
+      try {
+        if (job.scrapeType === 'documentation') {
+          fetchResult = await fetchMarkdownForUrl(job.sourceUrl);
+        } else {
+          fetchResult = await fetchCodeSnippetsForUrl(job.sourceUrl);
+        }
+
+        if (!fetchResult.success) {
+          isFetchError = true;
+          throw new Error(`Failed to fetch content: ${fetchResult.error}`);
+        }
+      } catch (error) {
+        isFetchError = true;
+        throw error;
+      }
+
+      // Check if we got any content
+      const hasContent =
+        fetchResult.markdown && fetchResult.markdown.trim().length > 0;
+
+      if (!hasContent) {
+        await this.markJobAsCompleted(job.id);
+        console.log(`No content found at URL ${job.sourceUrl}.`);
+
+        // Send progress event for this skipped job
+        if (job.jobId) {
+          sendEvent(job.jobId, {
+            type: 'progress',
+            message: `Skipped (no content): ${job.sourceUrl}`,
+          });
+        }
+        return;
+      }
+
+      // Update job payload with fresh content
+      const freshJobPayload: EmbeddingJobPayload = {
+        ...job,
+        contextMarkdown: fetchResult.markdown!,
+        rawSnippets: [], // Will be extracted from markdown if needed
+      };
+
+      console.log(
+        `Processing ${job.scrapeType} job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
+      );
+
+      await ragService.processJob(freshJobPayload);
+      await this.markJobAsCompleted(job.id);
+      console.log(`Job ${job.id} completed successfully.`);
+
+      // Send progress event for this completed job
+      if (job.jobId) {
+        sendEvent(job.jobId, {
+          type: 'progress',
+          message: `Completed processing: ${job.sourceUrl}`,
+        });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      const errorType = isFetchError ? 'fetch' : 'processing';
+      await this.markJobAsFailed(job.id, message, errorType);
+
+      // Send error event with error type
+      if (job.jobId) {
+        sendEvent(job.jobId, {
+          type: 'progress',
+          message: `Failed (${errorType}): ${job.sourceUrl} - ${message}`,
+        });
+      }
+
+      throw error; // Re-throw to let the queue handle it
     }
   }
 
@@ -429,7 +520,8 @@ class JobService {
   }
 
   /**
-   * Process a single embedding job by its database row ID.
+   * Process a single embedding job by database row ID.
+   * Now fetches fresh content from the source URL instead of using stored content.
    *
    * @param jobItemId - Database row ID (integer) from embedding_jobs.id
    *                    NOT the crawl batch UUID! This processes ONE specific URL.
@@ -451,50 +543,61 @@ class JobService {
     const job = rows[0];
 
     try {
-      // Check if job has content to process based on job type
+      // Update status to processing
+      await this.markJobAsProcessing(job.id);
+
+      // Fetch fresh content from the URL based on scrape type
+      let fetchResult;
+      if (job.scrapeType === 'documentation') {
+        fetchResult = await fetchMarkdownForUrl(job.sourceUrl || '');
+      } else {
+        fetchResult = await fetchCodeSnippetsForUrl(job.sourceUrl || '');
+      }
+
+      if (!fetchResult.success) {
+        throw new Error(`Failed to fetch content: ${fetchResult.error}`);
+      }
+
+      // Check if we got any content
       const hasContent =
-        job.scrapeType === 'documentation'
-          ? job.contextMarkdown && job.contextMarkdown.trim().length > 0
-          : job.rawSnippets &&
-            Array.isArray(job.rawSnippets) &&
-            job.rawSnippets.length > 0;
+        fetchResult.markdown && fetchResult.markdown.trim().length > 0;
 
       if (!hasContent) {
         await this.markJobAsCompleted(job.id);
-        const contentType =
-          job.scrapeType === 'documentation' ? 'markdown' : 'snippets';
         return {
           success: true,
-          message: `Job has no ${contentType} to process.`,
+          message: `No content found at URL ${job.sourceUrl}.`,
         };
       }
 
+      // Create job payload with fresh content
       const jobPayload: EmbeddingJobPayload = {
         jobId: job.jobId || '',
         libraryId: job.libraryId || '',
         libraryName: job.libraryName || '',
         libraryDescription: job.libraryDescription || '',
         sourceUrl: job.sourceUrl || '',
-        rawSnippets: Array.isArray(job.rawSnippets) ? job.rawSnippets : [],
-        contextMarkdown: job.contextMarkdown || undefined,
+        rawSnippets: [], // Will be extracted from markdown if needed
+        contextMarkdown: fetchResult.markdown!,
         scrapeType:
           (job.scrapeType as 'code' | 'documentation') || 'documentation',
         customEnrichmentPrompt: job.customEnrichmentPrompt || undefined,
       };
 
       console.log(
-        `Processing ${job.scrapeType} job ${job.id} for ${job.sourceUrl}`,
+        `Processing ${job.scrapeType} job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
       );
+
       await ragService.processJob(jobPayload);
       await this.markJobAsCompleted(job.id);
 
       return {
         success: true,
-        message: `Job ${job.id} processed successfully.`,
+        message: `Job ${job.id} processed successfully with fresh content.`,
       };
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      await this.markJobAsFailed(job.id, message);
+      await this.markJobAsFailed(job.id, message, 'processing');
       throw error;
     }
   }
@@ -699,7 +802,7 @@ class JobService {
               console.error(`Error processing job ${job.id}:`, error);
               const message =
                 error instanceof Error ? error.message : String(error);
-              await this.markJobAsFailed(job.id, message);
+              await this.markJobAsFailed(job.id, message, 'processing');
 
               // Send error event for this specific job
               if (job.jobId) {
