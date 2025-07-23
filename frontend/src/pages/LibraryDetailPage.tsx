@@ -31,7 +31,7 @@ const LibraryDetailPage: React.FC = () => {
   const navigate = useNavigate();
 
   const { data: libraries, isLoading: isLoadingLibraries } = useLibraries();
-  const { data: jobsData, refetch: refetchJobs } = useLibraryJobs(id!);
+  const { data: jobsData } = useLibraryJobs(id!);
   const { mutate: deleteLibrary, isPending: isDeleting } = useDeleteLibrary();
 
   const library = useMemo(
@@ -63,7 +63,7 @@ const LibraryDetailPage: React.FC = () => {
 
   const handleModalClose = () => {
     setAddDocsModalOpen(false);
-    refetchJobs();
+    // SSE will automatically update the jobs data when resources are added
   };
 
   const handleDeleteLibrary = () => {

@@ -15,7 +15,7 @@ const Layout: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        width: '100vw',
+        width: '99vw',
       }}
     >
       <AppBar position="fixed" color="default" elevation={1} sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>

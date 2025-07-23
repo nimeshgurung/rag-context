@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { OpenAPIV3 } from 'openapi-types';
 import { ApiSpecSource } from '../types';
-import { sendEvent, closeConnection } from '../events';
+import { sendEvent, sendMultiEvent } from '../events';
 import { SlopChunk } from '../../types';
 import { convertToSlopChunks } from '../../slop/converter';
 import { ragService } from '../rag/service';
@@ -19,11 +19,14 @@ export async function handleApiSpecSource(
 ) {
   try {
     let libraryId: string;
-    let libraryName: string;
-    let libraryDescription: string;
+    let libraryName: string = '';
+    let libraryDescription: string = '';
 
     if (existingLibraryId) {
+      // Use existing library
       libraryId = existingLibraryId;
+
+      // For existing libraries, we need to fetch the name and description
       const existing = await db
         .select({
           id: libraries.id,
@@ -37,12 +40,18 @@ export async function handleApiSpecSource(
       if (existing.length === 0) {
         throw new Error(`Library with id "${libraryId}" does not exist.`);
       }
+
       libraryName = existing[0].name || '';
       libraryDescription = existing[0].description || '';
 
-      sendEvent(jobId, {
-        type: 'progress',
-        message: `Adding API spec to existing library: ${libraryName}`,
+      // Send events to both job and library channels
+      sendMultiEvent([jobId, libraryId], {
+        type: 'resource:adding',
+        message: 'Adding API spec to existing library...',
+        jobId,
+        libraryId,
+        resourceType: 'api-spec',
+        source,
       });
     } else {
       libraryName = source.name;
@@ -70,9 +79,22 @@ export async function handleApiSpecSource(
         description: libraryDescription,
       });
 
-      sendEvent(jobId, {
-        type: 'progress',
+      // Send library created event to both channels
+      sendMultiEvent([jobId, libraryId], {
+        type: 'library:created',
         message: 'Library entry created.',
+        jobId,
+        libraryId,
+        name: libraryName,
+        description: libraryDescription,
+      });
+
+      // Also send to global library channel for library list updates
+      sendEvent('global', {
+        type: 'library:created',
+        libraryId,
+        name: libraryName,
+        description: libraryDescription,
       });
     }
 
@@ -105,11 +127,15 @@ export async function handleApiSpecSource(
     const chunks: SlopChunk[] = convertToSlopChunks(libraryId, spec);
 
     if (chunks.length === 0) {
-      closeConnection(jobId, {
-        type: 'done',
+      sendMultiEvent([jobId, libraryId], {
+        type: 'resource:added',
         message: existingLibraryId
           ? `API spec added to library ${libraryId}, but no content was ingested.`
           : `Library ${libraryId} created, but no content was ingested.`,
+        jobId,
+        libraryId,
+        resourceType: 'api-spec',
+        source,
       });
       return;
     }
@@ -144,16 +170,33 @@ export async function handleApiSpecSource(
       message: 'Ingestion complete.',
     });
 
-    closeConnection(jobId, {
+    const metadata = {
+      specInfo: spec.info,
+      chunksGenerated: chunks.length,
+    };
+
+    // Send completion events to both channels
+    const finalMessage = existingLibraryId
+      ? `API spec added to library ${libraryId} successfully. Generated ${chunks.length} chunks.`
+      : `API spec ingested successfully for library ${libraryId}. Generated ${chunks.length} chunks.`;
+
+    sendMultiEvent([jobId, libraryId], {
+      type: existingLibraryId ? 'resource:added' : 'library:completed',
+      message: finalMessage,
+      jobId,
+      libraryId,
+      metadata,
+    });
+
+    sendEvent(jobId, {
       type: 'done',
-      message: existingLibraryId
-        ? `API spec added to library ${libraryId} and ingested successfully.`
-        : `Library ${libraryId} created and ingested successfully.`,
+      message: finalMessage,
+      metadata,
     });
   } catch (error) {
     console.error(`[Job ${jobId}] Error in handleApiSpecSource:`, error);
     const message =
       error instanceof Error ? error.message : 'An unknown error occurred.';
-    closeConnection(jobId, { type: 'error', message });
+    sendEvent(jobId, { type: 'error', message });
   }
 }

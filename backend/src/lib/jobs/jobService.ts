@@ -8,7 +8,7 @@ import { eq, desc, sql, inArray } from 'drizzle-orm';
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
-import { sendEvent, closeConnection } from '../events';
+import { sendEvent } from '../events';
 import {
   fetchMarkdownForUrl,
   fetchCodeSnippetsForUrl,
@@ -598,7 +598,7 @@ class JobService {
             type: 'progress',
             message: `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           });
-          closeConnection(jobId, {
+          sendEvent(jobId, {
             type: 'error',
             message: 'Job processing failed',
           });
@@ -747,7 +747,7 @@ class JobService {
           if (jobId) {
             console.log('Finished processing for scoped jobId. Exiting.');
             // Send completion event when all jobs are done
-            closeConnection(jobId, {
+            sendEvent(jobId, {
               type: 'done',
               message: 'All jobs completed successfully.',
             });

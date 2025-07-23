@@ -1,36 +1,46 @@
 import { Response } from 'express';
 
-// Simple in-memory store for active SSE clients (kept for potential future use)
-// Note: SSE is currently disabled in favor of polling
-const clients = new Map<string, Response>();
+// Store for active SSE clients - supports multiple clients per resource
+const clients = new Map<string, Set<Response>>();
 
-export function addClient(jobId: string, client: Response) {
-  clients.set(jobId, client);
+export function addClient(resourceId: string, client: Response) {
+  if (!clients.has(resourceId)) {
+    clients.set(resourceId, new Set());
+  }
+  clients.get(resourceId)!.add(client);
 }
 
-export function removeClient(jobId: string) {
-  clients.delete(jobId);
-}
-
-export function sendEvent(jobId: string, data: object) {
-  // Log events for debugging even though SSE is disabled
-  console.log(`[Event ${jobId}]:`, data);
-
-  const client = clients.get(jobId);
-  if (client) {
-    client.write(`data: ${JSON.stringify(data)}\n\n`);
+export function removeClient(resourceId: string, client: Response) {
+  const clientSet = clients.get(resourceId);
+  if (clientSet) {
+    clientSet.delete(client);
+    if (clientSet.size === 0) {
+      clients.delete(resourceId);
+    }
   }
 }
 
-export function closeConnection(jobId: string, finalData: object) {
-  console.log(`[Event ${jobId} - Final]:`, finalData);
+export function sendEvent(resourceId: string, data: object) {
+  console.log(`[Event ${resourceId}]:`, data);
 
-  const client = clients.get(jobId);
-  if (client) {
-    client.write(`data: ${JSON.stringify(finalData)}\n\n`);
-    client.end();
-    removeClient(jobId);
+  const clientSet = clients.get(resourceId);
+  if (clientSet) {
+    const eventData = `data: ${JSON.stringify(data)}\n\n`;
+    clientSet.forEach((client) => {
+      try {
+        client.write(eventData);
+      } catch (error) {
+        console.error(
+          `Failed to send event to client for ${resourceId}:`,
+          error,
+        );
+        removeClient(resourceId, client);
+      }
+    });
   }
 }
 
-// Removed EventManager class and all complex buffering/reconnection logic
+// Send event to multiple resources (e.g., both job and library)
+export function sendMultiEvent(resourceIds: string[], data: object) {
+  resourceIds.forEach((id) => sendEvent(id, data));
+}

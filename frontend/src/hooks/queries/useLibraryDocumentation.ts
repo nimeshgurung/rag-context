@@ -1,11 +1,41 @@
-import { useQuery } from '@tanstack/react-query';
+import { useSSEQuery } from '../useSSEQuery';
 import { libraryKeys } from '../../lib/queryKeys';
 import { fetchLibraryDocumentation } from '../../services/api';
+import type { SSEEvent } from '../../lib/sse-manager';
 
-export function useLibraryDocumentation(libraryId: string, topic?: string) {
-  return useQuery({
-    queryKey: libraryKeys.doc(libraryId, topic),
-    queryFn: () => fetchLibraryDocumentation(libraryId, topic),
-    enabled: !!libraryId,
-  });
+interface UseLibraryDocumentationOptions {
+  enabled?: boolean;
+  topic?: string;
+  onResourceAdded?: (event: SSEEvent) => void;
+  onProcessingComplete?: (event: SSEEvent) => void;
+}
+
+export function useLibraryDocumentation(
+  libraryId: string,
+  options: UseLibraryDocumentationOptions = {}
+) {
+  const { enabled = true, topic, onResourceAdded, onProcessingComplete } = options;
+
+  return useSSEQuery(
+    libraryKeys.doc(libraryId, topic),
+    () => fetchLibraryDocumentation(libraryId, topic),
+    {
+      enabled,
+      resourceType: 'library',
+      resourceId: libraryId,
+      onEvent: (event) => {
+        console.log('Library documentation SSE event:', event);
+
+        // Handle specific events
+        switch (event.type) {
+          case 'resource:added':
+            onResourceAdded?.(event);
+            break;
+          case 'processing:completed':
+            onProcessingComplete?.(event);
+            break;
+        }
+      },
+    }
+  );
 }

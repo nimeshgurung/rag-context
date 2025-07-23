@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobKeys } from '../../lib/queryKeys';
 import {
   getCrawlJobStatus,
@@ -7,11 +7,14 @@ import {
   deleteJob
 } from '../../services/api';
 import type { JobBatch, JobItem } from '../../types';
+import { useSSEQuery } from '../useSSEQuery';
+import type { SSEEvent } from '../../lib/sse-manager';
 
 interface UseJobBatchOptions {
   enabled?: boolean;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
+  onEvent?: (event: SSEEvent) => void;
 }
 
 // Helper function to recalculate summary
@@ -27,12 +30,12 @@ function recalculateSummary(jobs: JobItem[]): JobBatch['summary'] {
 
 export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
   const queryClient = useQueryClient();
-  const { enabled = false, onSuccess, onError } = options;
+  const { enabled = false, onSuccess, onError, onEvent } = options;
 
-  // Fetch job batch status with automatic polling
-  const query = useQuery({
-    queryKey: jobKeys.batch(jobId),
-    queryFn: async () => {
+  // Fetch job batch status with SSE updates
+  const query = useSSEQuery(
+    jobKeys.batch(jobId),
+    async () => {
       const status = await getCrawlJobStatus(jobId);
       // Map to JobBatch format
       const jobBatchData: JobBatch = {
@@ -48,14 +51,17 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
       };
       return jobBatchData;
     },
-    enabled,
-    refetchInterval: ({ state }) => {
-      // Dynamic polling: 2s if processing, stop if complete
-      if (!state.data) return false;
-      const isProcessing = state.data.summary.processing > 0 || state.data.summary.pending > 0;
-      return isProcessing ? 2000 : false;
-    },
-  });
+    {
+      enabled,
+      resourceType: 'job',
+      resourceId: jobId,
+      onEvent: (event) => {
+        console.log('Job batch SSE event:', event);
+        onEvent?.(event);
+      },
+      // No more refetchInterval needed - SSE handles updates
+    }
+  );
 
   // Process all jobs mutation
   const processAllMutation = useMutation({
@@ -84,7 +90,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
 
       return { previousData };
     },
-    onError: (err, variables, context) => {
+    onError: (err, _, context) => {
       // Revert optimistic update
       if (context?.previousData) {
         queryClient.setQueryData(jobKeys.batch(jobId), context.previousData);
@@ -92,8 +98,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
       onError?.(err as Error);
     },
     onSuccess: () => {
-      // Force immediate refetch to start polling
-      queryClient.invalidateQueries({ queryKey: jobKeys.batch(jobId) });
+      // SSE will handle the updates, no need to force refetch
       onSuccess?.();
     },
   });
@@ -121,7 +126,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
 
       return { previousData };
     },
-    onError: (err, variables, context) => {
+    onError: (err, _, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(jobKeys.batch(jobId), context.previousData);
       }
@@ -154,7 +159,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
 
       return { previousData };
     },
-    onError: (err, variables, context) => {
+    onError: (err, _, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(jobKeys.batch(jobId), context.previousData);
       }
@@ -193,7 +198,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
 
       return { previousData };
     },
-    onError: (err, variables, context) => {
+    onError: (err, _, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(jobKeys.batch(jobId), context.previousData);
       }
@@ -228,7 +233,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
 
       return { previousData };
     },
-    onError: (err, variables, context) => {
+    onError: (err, _, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(jobKeys.batch(jobId), context.previousData);
       }
