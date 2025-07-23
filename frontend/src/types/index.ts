@@ -1,7 +1,10 @@
-export interface Job {
+export interface JobItem {
   id: number;
   sourceUrl: string;
   status: string;
+  processedAt: string | null;
+  errorMessage: string | null;
+  scrapeType: string;
 }
 
 export interface JobSummary {
@@ -12,7 +15,9 @@ export interface JobSummary {
   failed: number;
 }
 
-export interface JobStatus {
+export interface JobBatch {
+  jobId: string;
+  createdAt: string;
   summary: JobSummary;
-  jobs: Job[];
+  jobs: JobItem[];
 }

@@ -1,38 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import {
   Box,
-  CircularProgress,
   Alert,
+  CircularProgress,
 } from '@mui/material';
-import { getAllJobsForLibrary } from '../../services/api';
 import JobBatchAccordion from './JobBatchAccordion';
-
-interface JobItem {
-  id: number;
-  sourceUrl: string;
-  status: string;
-  processedAt: string | null;
-  errorMessage: string | null;
-  scrapeType: string;
-}
-
-interface JobBatch {
-  jobId: string;
-  createdAt: string;
-  summary: {
-    total: number;
-    pending: number;
-    processing: number;
-    completed: number;
-    failed: number;
-  };
-  jobs: JobItem[];
-}
-
-interface JobsData {
-  totalJobs: number;
-  batches: JobBatch[];
-}
+import { useLibraryJobs } from '../../hooks/queries/useLibraryJobs';
 
 interface JobsTabProps {
   libraryId: string;
@@ -40,43 +13,13 @@ interface JobsTabProps {
 }
 
 const JobsTab: React.FC<JobsTabProps> = ({ libraryId, onJobsUpdate }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [jobsData, setJobsData] = useState<JobsData | null>(null);
-
-  const fetchJobs = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getAllJobsForLibrary(libraryId);
-      setJobsData(data);
-      // Notify parent of job updates for summary refresh
-      if (onJobsUpdate) {
-        onJobsUpdate();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch jobs');
-    } finally {
-      setLoading(false);
-    }
-  }, [libraryId, onJobsUpdate]);
-
-  useEffect(() => {
-    if (libraryId) {
-      fetchJobs();
-    }
-  }, [libraryId, fetchJobs]);
-
-
+  const { data: jobsData, isLoading, error } = useLibraryJobs(libraryId);
 
   return (
     <Box>
-
-
-
       {/* Job Batches */}
       <Box>
-        {loading && (
+        {isLoading && (
           <Box display="flex" justifyContent="center" p={3}>
             <CircularProgress />
           </Box>
@@ -84,11 +27,11 @@ const JobsTab: React.FC<JobsTabProps> = ({ libraryId, onJobsUpdate }) => {
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {error instanceof Error ? error.message : 'Failed to fetch jobs'}
           </Alert>
         )}
 
-        {jobsData && !loading && (
+        {jobsData && !isLoading && (
           <>
             {(jobsData.batches?.length || 0) === 0 ? (
               <Alert severity="info">

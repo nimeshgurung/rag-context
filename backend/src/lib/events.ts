@@ -1,7 +1,7 @@
 import { Response } from 'express';
 
-// This is a simple in-memory store for active SSE clients.
-// It is not suitable for a multi-server deployment but is perfect for our needs.
+// Simple in-memory store for active SSE clients (kept for potential future use)
+// Note: SSE is currently disabled in favor of polling
 const clients = new Map<string, Response>();
 
 export function addClient(jobId: string, client: Response) {
@@ -13,6 +13,9 @@ export function removeClient(jobId: string) {
 }
 
 export function sendEvent(jobId: string, data: object) {
+  // Log events for debugging even though SSE is disabled
+  console.log(`[Event ${jobId}]:`, data);
+
   const client = clients.get(jobId);
   if (client) {
     client.write(`data: ${JSON.stringify(data)}\n\n`);
@@ -20,6 +23,8 @@ export function sendEvent(jobId: string, data: object) {
 }
 
 export function closeConnection(jobId: string, finalData: object) {
+  console.log(`[Event ${jobId} - Final]:`, finalData);
+
   const client = clients.get(jobId);
   if (client) {
     client.write(`data: ${JSON.stringify(finalData)}\n\n`);
@@ -27,3 +32,5 @@ export function closeConnection(jobId: string, finalData: object) {
     removeClient(jobId);
   }
 }
+
+// Removed EventManager class and all complex buffering/reconnection logic
