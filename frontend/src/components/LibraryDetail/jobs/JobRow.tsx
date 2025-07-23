@@ -7,7 +7,6 @@ import type { JobItem } from '../../../types';
 interface JobRowProps {
   job: JobItem;
   isSelected: boolean;
-  isProcessing: boolean;
   onToggleSelection: () => void;
   onProcess: () => void;
   onDelete: () => void;
@@ -16,7 +15,6 @@ interface JobRowProps {
 export const JobRow: React.FC<JobRowProps> = ({
   job,
   isSelected,
-  isProcessing,
   onToggleSelection,
   onProcess,
   onDelete,
@@ -42,7 +40,6 @@ export const JobRow: React.FC<JobRowProps> = ({
           <IconButton
             size="small"
             onClick={onProcess}
-            disabled={isProcessing}
             title="Process"
           >
             <PlayArrow fontSize="small" />
@@ -52,7 +49,6 @@ export const JobRow: React.FC<JobRowProps> = ({
           <IconButton
             size="small"
             onClick={onProcess}
-            disabled={isProcessing}
             title="Reprocess"
             color="primary"
           >
@@ -62,7 +58,7 @@ export const JobRow: React.FC<JobRowProps> = ({
         <IconButton
           size="small"
           onClick={onDelete}
-          disabled={isProcessing}
+          disabled={job.status === 'processing'}
           title="Delete"
           color="error"
         >
