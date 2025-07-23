@@ -42,6 +42,9 @@ export const embeddings = pgTable(
     libraryId: text('library_id')
       .notNull()
       .references(() => libraries.id, { onDelete: 'cascade' }),
+    jobId: integer('job_id').references(() => embeddingJobs.id, {
+      onDelete: 'cascade',
+    }),
     contentType: text('content_type').notNull(),
     title: text('title'),
     description: text('description'),
@@ -58,6 +61,10 @@ export const embeddings = pgTable(
     ),
     // Index for filtering by library
     index('idx_embeddings_library_id').on(table.libraryId),
+    // Composite index for efficient deletion by library and source URL
+    index('idx_embeddings_library_source').on(table.libraryId, table.sourceUrl),
+    // Index for job_id foreign key
+    index('idx_embeddings_job_id').on(table.jobId),
     // HNSW index for vector similarity search
     index('idx_embeddings_embedding').using(
       'hnsw',

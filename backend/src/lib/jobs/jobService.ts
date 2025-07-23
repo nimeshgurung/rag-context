@@ -29,6 +29,7 @@ interface EmbeddingJobRow extends Record<string, unknown> {
 }
 
 export interface EmbeddingJobPayload {
+  id?: number; // The database row ID for the job
   jobId?: string;
   libraryId: string;
   libraryName: string;
@@ -356,6 +357,7 @@ class JobService {
       // Update job payload with fresh content
       const freshJobPayload: EmbeddingJobPayload = {
         ...job,
+        id: job.id, // Include the job ID
         contextMarkdown: fetchResult.markdown!,
         rawSnippets: [], // Will be extracted from markdown if needed
       };
@@ -474,45 +476,16 @@ class JobService {
   }
 
   /**
-   * Delete a single embedding job and its associated embeddings by database row ID.
+   * Delete a single embedding job. Associated embeddings are automatically
+   * deleted via CASCADE constraint on the foreign key.
    *
    * @param jobItemId - Database row ID (integer) from embedding_jobs.id
-   *                    NOT the crawl batch UUID! This deletes ONE specific URL.
    * @returns Promise with success status
-   *
-   * Example: deleteJob(3) deletes just the URL in database row 3 and its embeddings
    */
   async deleteJob(jobItemId: number) {
     try {
-      return await db.transaction(async (tx) => {
-        // Get job details first
-        const job = await tx
-          .select({
-            sourceUrl: embeddingJobs.sourceUrl,
-            libraryId: embeddingJobs.libraryId,
-          })
-          .from(embeddingJobs)
-          .where(eq(embeddingJobs.id, jobItemId))
-          .limit(1);
-
-        if (job.length === 0) {
-          throw new Error(`Job item with ID ${jobItemId} not found.`);
-        }
-
-        const { sourceUrl, libraryId } = job[0];
-
-        // Delete associated embeddings using raw SQL for JSONB query
-        await tx.execute(sql`
-          DELETE FROM embeddings
-          WHERE library_id = ${libraryId}
-          AND metadata->>'source' = ${sourceUrl || ''}
-        `);
-
-        // Delete the job
-        await tx.delete(embeddingJobs).where(eq(embeddingJobs.id, jobItemId));
-
-        return { success: true };
-      });
+      await db.delete(embeddingJobs).where(eq(embeddingJobs.id, jobItemId));
+      return { success: true };
     } catch (error) {
       console.error(`Failed to delete job item ${jobItemId}:`, error);
       throw error;
@@ -572,7 +545,8 @@ class JobService {
 
       // Create job payload with fresh content
       const jobPayload: EmbeddingJobPayload = {
-        jobId: job.jobId || '',
+        id: job.id, // Include the job ID
+        jobId: job.jobId || undefined,
         libraryId: job.libraryId || '',
         libraryName: job.libraryName || '',
         libraryDescription: job.libraryDescription || '',

@@ -206,6 +206,7 @@ class RagService {
         chunk,
       ),
       libraryId: job.libraryId,
+      jobId: job.id, // Link to the embedding job record
       contentType: 'documentation' as const,
       title: null,
       originalText: chunk,
@@ -281,6 +282,7 @@ class RagService {
         item.code,
       ),
       libraryId: job.libraryId,
+      jobId: job.id, // Link to the embedding job record
       contentType: 'code-example' as const,
       title: item.title,
       originalText: item.code,
