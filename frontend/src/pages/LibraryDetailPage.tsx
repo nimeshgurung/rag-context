@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -13,24 +13,11 @@ import {
 import { Search, Work, Add, Delete } from '@mui/icons-material';
 import SearchTab from '../components/LibraryDetail/SearchTab';
 import JobsTab from '../components/LibraryDetail/JobsTab';
-import { getLibraries, getAllJobsForLibrary, deleteLibrary } from '../services/api';
+import { useLibraries } from '../hooks/queries/useLibraries';
+import { useLibraryJobs } from '../hooks/queries/useLibraryJobs';
+import { useDeleteLibrary } from '../hooks/mutations/useDeleteLibrary';
 import AddDocsModal from '../components/AddDocsModal';
 import { useDialog } from '../context/DialogProvider';
-import { useNavigate } from 'react-router-dom';
-
-interface Library {
-  libraryId: string;
-  name: string;
-  description: string;
-}
-
-interface JobSummary {
-  total: number;
-  pending: number;
-  processing: number;
-  completed: number;
-  failed: number;
-}
 
 const LibraryDetailPage: React.FC = () => {
   const { libraryId } = useParams<{ libraryId: string }>();
@@ -39,59 +26,32 @@ const LibraryDetailPage: React.FC = () => {
   const id = libraryId || fallbackId;
 
   const [activeTab, setActiveTab] = useState(0);
-  const [library, setLibrary] = useState<Library | null>(null);
-  const [jobSummary, setJobSummary] = useState<JobSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [addDocsModalOpen, setAddDocsModalOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const { showDialog, showConfirm } = useDialog();
+  const { showConfirm, showDialog } = useDialog();
   const navigate = useNavigate();
 
-  const fetchLibraryData = useCallback(async () => {
-    try {
-      const libraries = await getLibraries();
-      const foundLibrary = libraries.find(lib => lib.libraryId === id);
-      if (foundLibrary) {
-        setLibrary(foundLibrary);
-      } else {
-        setError('Library not found');
-      }
-    } catch (err) {
-      setError('Failed to load library data: ' + (err as Error)?.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const { data: libraries, isLoading: isLoadingLibraries } = useLibraries();
+  const { data: jobsData, refetch: refetchJobs } = useLibraryJobs(id!);
+  const { mutate: deleteLibrary, isPending: isDeleting } = useDeleteLibrary();
 
-  const fetchJobSummary = useCallback(async () => {
-    if (!id) return;
-    try {
-      const jobsData = await getAllJobsForLibrary(id);
-      // Calculate total summary across all batches
-      const totalSummary = jobsData.batches.reduce(
-        (acc, batch) => ({
-          total: acc.total + batch.summary.total,
-          pending: acc.pending + batch.summary.pending,
-          processing: acc.processing + batch.summary.processing,
-          completed: acc.completed + batch.summary.completed,
-          failed: acc.failed + batch.summary.failed,
-        }),
-        { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 }
-      );
-      setJobSummary(totalSummary);
-    } catch (err) {
-      console.error('Failed to fetch job summary:', err);
-    }
-  }, [id]);
+  const library = useMemo(
+    () => libraries?.find((lib) => lib.libraryId === id),
+    [libraries, id]
+  );
 
-  useEffect(() => {
-    if (id) {
-      fetchLibraryData();
-      fetchJobSummary();
-    }
-  }, [id, fetchJobSummary, fetchLibraryData]);
+  const jobSummary = useMemo(() => {
+    if (!jobsData) return { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 };
+    return jobsData.batches.reduce(
+      (acc, batch) => ({
+        total: acc.total + batch.summary.total,
+        pending: acc.pending + batch.summary.pending,
+        processing: acc.processing + batch.summary.processing,
+        completed: acc.completed + batch.summary.completed,
+        failed: acc.failed + batch.summary.failed,
+      }),
+      { total: 0, pending: 0, processing: 0, completed: 0, failed: 0 }
+    );
+  }, [jobsData]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -103,35 +63,30 @@ const LibraryDetailPage: React.FC = () => {
 
   const handleModalClose = () => {
     setAddDocsModalOpen(false);
-    // Refresh job data after adding resource
-    fetchJobSummary();
+    refetchJobs();
   };
 
-  const handleDeleteLibrary = async () => {
+  const handleDeleteLibrary = () => {
     if (!library) return;
 
     showConfirm(
       'Confirm Deletion',
       `Are you sure you want to delete the "${library.name}" library and all its associated data? This action cannot be undone.`,
-      async () => {
-        setDeleting(true);
-        try {
-          await deleteLibrary(library.libraryId);
-          showDialog('Success', 'Library deleted successfully.');
-          navigate('/'); // Redirect to home
-        } catch (error) {
-          console.error('Failed to delete library', error);
-          showDialog('Error', 'Could not delete the library.');
-        } finally {
-          setDeleting(false);
-        }
-      },
+      () => {
+        deleteLibrary(library.libraryId, {
+          onSuccess: () => {
+            showDialog('Success', 'Library deleted successfully.');
+            navigate('/');
+          },
+          onError: () => {
+            showDialog('Error', 'Could not delete the library.');
+          },
+        });
+      }
     );
   };
 
-
-
-  if (loading) {
+  if (isLoadingLibraries) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <CircularProgress />
@@ -139,10 +94,10 @@ const LibraryDetailPage: React.FC = () => {
     );
   }
 
-  if (error || !library) {
+  if (!library) {
     return (
       <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error || 'Library not found'}</Alert>
+        <Alert severity="error">Library not found</Alert>
       </Box>
     );
   }
@@ -151,7 +106,7 @@ const LibraryDetailPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       {/* Library Header */}
       <Paper sx={{ p: 3, mb: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'between', alignItems: 'flex-start', mb: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="h4" component="h1" gutterBottom>
               {library.name}
@@ -176,9 +131,9 @@ const LibraryDetailPage: React.FC = () => {
               color="error"
               startIcon={<Delete />}
               onClick={handleDeleteLibrary}
-              disabled={deleting}
+              disabled={isDeleting}
             >
-              {deleting ? 'Deleting...' : 'Delete Library'}
+              {isDeleting ? 'Deleting...' : 'Delete Library'}
             </Button>
           </Box>
         </Box>
@@ -207,7 +162,7 @@ const LibraryDetailPage: React.FC = () => {
       {/* Tab Content */}
       <Box>
         {activeTab === 0 && <SearchTab libraryId={id!} />}
-        {activeTab === 1 && <JobsTab libraryId={id!} onJobsUpdate={fetchJobSummary} />}
+        {activeTab === 1 && <JobsTab libraryId={id!} />}
       </Box>
 
       {/* Add Docs Modal */}

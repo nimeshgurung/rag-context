@@ -9,38 +9,31 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { startCrawl } from '../services/api';
+import { useStartCrawl } from '../hooks/mutations/useStartCrawl';
 
 const AddSourcePage = () => {
   const [libraryName, setLibraryName] = useState('');
   const [libraryDescription, setLibraryDescription] = useState('');
   const [startUrl, setStartUrl] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setIsLoading(true);
-    setError(null);
+  const { mutate: startCrawl, isPending: isLoading, error } = useStartCrawl();
 
-    try {
-      const result = await startCrawl({
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    startCrawl(
+      {
         libraryName,
         libraryDescription,
         startUrl,
-        scrapeType: 'documentation', // Default to documentation for simple form
-      });
-      navigate(`/jobs/${result.jobId}`);
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || 'Failed to start crawl job.');
-      } else {
-        setError('An unknown error occurred.');
+        scrapeType: 'documentation',
+      },
+      {
+        onSuccess: (data) => {
+          navigate(`/jobs/${data.jobId}`);
+        },
       }
-    } finally {
-      setIsLoading(false);
-    }
+    );
   };
 
   return (
@@ -83,7 +76,7 @@ const AddSourcePage = () => {
         />
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
+            {error.message}
           </Alert>
         )}
         <Button

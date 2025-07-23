@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -15,77 +15,26 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
-import {
-  getLibraries,
-  deleteLibrary,
-} from '../services/api';
+import { useLibraries } from '../hooks/queries/useLibraries';
+import { useDeleteLibrary } from '../hooks/mutations/useDeleteLibrary';
 import { useDialog } from '../context/DialogProvider';
 import AddDocsModal from '../components/AddDocsModal';
 
-interface Library {
-  libraryId: string;
-  name: string;
-  description: string;
-  similarityScore: number;
-}
-
 const HomePage: React.FC = () => {
-  const [libraries, setLibraries] = useState<Library[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [addDocsModalOpen, setAddDocsModalOpen] = useState(false);
   const [selectedLibrary, setSelectedLibrary] = useState<{ id: string; name: string } | null>(null);
-  const { showDialog, showConfirm } = useDialog();
+  const { showConfirm } = useDialog();
 
-  const fetchLibraries = useCallback(async () => {
-    try {
-      setLoading(true);
-      const results = await getLibraries();
-      setLibraries(results);
-    } catch (error) {
-      console.error('Failed to fetch libraries', error);
-      showDialog('Error', 'Failed to fetch libraries.');
-    } finally {
-      setLoading(false);
-    }
-  }, [showDialog]);
+  const { data: libraries = [], isLoading: loading } = useLibraries();
+  const { mutate: deleteLibrary, isPending: isDeleting } = useDeleteLibrary();
 
-  useEffect(() => {
-    fetchLibraries();
-
-    const handleLibraryAdded = () => {
-      console.log('New library added, refetching list...');
-      fetchLibraries();
-    };
-
-    window.addEventListener('library-added', handleLibraryAdded);
-
-    return () => {
-      window.removeEventListener('library-added', handleLibraryAdded);
-    };
-  }, [fetchLibraries]);
-
-
-
-  const handleDeleteLibrary = async (
-    libraryId: string,
-    libraryName: string,
-  ) => {
+  const handleDeleteLibrary = (libraryId: string, libraryName: string) => {
     showConfirm(
       'Confirm Deletion',
       `Are you sure you want to delete the "${libraryName}" library and all its associated data? This action cannot be undone.`,
-      async () => {
-        setDeletingId(libraryId);
-        try {
-          await deleteLibrary(libraryId);
-          fetchLibraries(); // Refresh the list
-        } catch (error) {
-          console.error('Failed to delete library', error);
-          showDialog('Error', 'Could not delete the library.');
-        } finally {
-          setDeletingId(null);
-        }
+      () => {
+        deleteLibrary(libraryId);
       },
     );
   };
@@ -98,14 +47,12 @@ const HomePage: React.FC = () => {
   const handleModalClose = () => {
     setAddDocsModalOpen(false);
     setSelectedLibrary(null);
-    // Refresh libraries in case a resource was added
-    fetchLibraries();
   };
 
   const filteredLibraries = libraries.filter(
     (library) =>
       library.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      library.description.toLowerCase().includes(searchTerm.toLowerCase()),
+      library.description?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -136,8 +83,8 @@ const HomePage: React.FC = () => {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} align="center">
-                  Loading...
+                <TableCell colSpan={4} align="center">
+                  <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : (
@@ -173,10 +120,10 @@ const HomePage: React.FC = () => {
                       onClick={() =>
                         handleDeleteLibrary(row.libraryId, row.name)
                       }
-                      disabled={deletingId === row.libraryId}
+                      disabled={isDeleting}
                       sx={{ ml: 1 }}
                     >
-                      {deletingId === row.libraryId ? (
+                      {isDeleting ? (
                         <CircularProgress size={20} />
                       ) : (
                         'Delete'
