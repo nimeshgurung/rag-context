@@ -169,7 +169,8 @@ const LibraryDetailPage: React.FC = () => {
       <AddDocsModal
         open={addDocsModalOpen}
         onClose={handleModalClose}
-        existingLibrary={{ id: library.libraryId, name: library.name }}
+        existingLibrary={library ? { id: library.libraryId, name: library.name } : null}
+        activeTab={activeTab}
       />
     </Box>
   );

@@ -4,7 +4,7 @@ import cors from 'cors';
 // Import route modules
 import librariesRoutes from './routes/libraries.js';
 import documentationRoutes from './routes/documentation.js';
-import crawlRoutes from './routes/crawl.js';
+import jobsRoutes from './routes/jobs.js';
 import eventsRoutes from './routes/events.js';
 
 const app = express();
@@ -12,13 +12,18 @@ const port = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json());
 
-// Route handlers
+// Routes
 app.use('/api/libraries', librariesRoutes);
-app.use('/api/docs', documentationRoutes);
-app.use('/api/crawl', crawlRoutes);
-app.use('/api/jobs', eventsRoutes);
+app.use('/api/documentation', documentationRoutes);
+app.use('/api/jobs', jobsRoutes);
+app.use('/api/events', eventsRoutes);
+
+// Test route
+app.get('/api/test', (req: Request, res: Response) => {
+  res.send('Test route is working');
+});
 
 app.post('/api/search', (req: Request, res: Response) => {
   // Redirect to the new /search endpoint

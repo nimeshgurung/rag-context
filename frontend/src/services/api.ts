@@ -95,33 +95,10 @@ export async function addDocumentationSource(
   return response.json();
 }
 
-export async function startCrawl(data: {
-  libraryName: string;
-  libraryDescription: string;
-  startUrl: string;
-  scrapeType: 'code' | 'documentation';
-  customEnrichmentPrompt?: string;
-}): Promise<{ jobId: string }> {
-  const response = await fetch(`${API_BASE_URL}/crawl/start`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to start crawl');
-  }
-
-  return response.json();
-}
-
 export async function getCrawlJobStatus(
   jobId: string,
 ): Promise<CrawlJobStatus> {
-  const response = await fetch(`${API_BASE_URL}/crawl/status/${jobId}`);
+  const response = await fetch(`${API_BASE_URL}/jobs/status/${jobId}`);
   if (!response.ok) {
     throw new Error('Failed to fetch job status');
   }
@@ -136,7 +113,7 @@ export async function deleteJob(jobItemId: number) {
 }
 
 export async function processSingleJob(jobItemId: number) {
-  const response = await fetch(`${API_BASE_URL}/crawl/process/single`, {
+  const response = await fetch(`${API_BASE_URL}/jobs/process/single`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -22,7 +22,7 @@ const Layout: React.FC = () => {
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-              UBSContext
+              UBS Context
             </Link>
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

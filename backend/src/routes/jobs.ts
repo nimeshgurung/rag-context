@@ -3,40 +3,10 @@ import {
   getCrawlJobStatus,
   deleteJob,
   processSingleJob,
-  startCrawlJob,
   processAllJobs,
 } from '../lib/jobs/service';
 
 const router = express.Router();
-
-interface StartCrawlRequestBody {
-  startUrl: string;
-  libraryName: string;
-  libraryDescription?: string;
-  scrapeType: 'code' | 'documentation';
-  customEnrichmentPrompt?: string;
-}
-
-// Start a crawl job
-router.post(
-  '/start',
-  (req: Request<object, object, StartCrawlRequestBody>, res: Response) => {
-    startCrawlJob(
-      req.body.libraryName,
-      req.body.libraryDescription || '',
-      req.body.startUrl,
-      req.body.scrapeType,
-      req.body.customEnrichmentPrompt,
-    )
-      .then((jobId) => {
-        res.status(202).json({ jobId });
-      })
-      .catch((error) => {
-        console.error('Failed to start crawl job:', error);
-        res.status(500).json({ error: 'Failed to start crawl job' });
-      });
-  },
-);
 
 // Get crawl job status
 router.get(
