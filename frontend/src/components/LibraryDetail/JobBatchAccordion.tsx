@@ -19,6 +19,7 @@ import {
 import JobActions from '../JobStatus/JobActions';
 import JobsTable from '../JobStatus/JobsTable';
 import { useDialog } from '../../context/DialogProvider';
+import { useJobProgress } from '../../hooks/useJobProgress';
 import type { JobStatus } from '../../types';
 
 interface JobItem {
@@ -59,41 +60,61 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
   const { showSnackbar, showConfirm } = useDialog();
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [processingJobId, setProcessingJobId] = useState<number | null>(null);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [filterText, setFilterText] = useState<string>('');
   const [selectedJobIds, setSelectedJobIds] = useState<Set<number>>(new Set());
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  // Use the job progress hook
+  const { isProcessing, startListening, setProcessing, progress } = useJobProgress();
 
   const fetchStatus = useCallback(async () => {
     try {
       const result = await getCrawlJobStatus(batch.jobId);
       setStatus(result);
-      if (result.summary.pending === 0 && result.summary.processing === 0) {
-        setIsProcessing(false);
-      }
       if (onUpdate) {
         onUpdate();
       }
+      return result;
     } catch (err) {
       console.error('Failed to fetch job status:', err);
+      return null;
     }
   }, [batch.jobId, onUpdate]);
 
   useEffect(() => {
     if (isExpanded) {
-      fetchStatus()
+      fetchStatus();
     }
   }, [isExpanded, fetchStatus]);
 
-  // Add polling while processing
+  // Replace polling with EventSource when processing
   useEffect(() => {
     if (!isExpanded || !isProcessing) return;
 
-    const interval = 2000; // Poll every 2 seconds while processing
-    const pollInterval = setInterval(fetchStatus, interval);
+    let eventSource: EventSource | null = null;
 
-    return () => clearInterval(pollInterval);
-  }, [isExpanded, isProcessing, fetchStatus]);
+    eventSource = startListening(
+      batch.jobId,
+      // onDone callback
+      async () => {
+        setProcessing(false);
+        await fetchStatus(); // Final status fetch
+        showSnackbar('All jobs completed', 'success');
+      },
+      // onError callback
+      async () => {
+        setProcessing(false);
+        await fetchStatus(); // Fetch status on error too
+        showSnackbar('Processing error occurred', 'error');
+      }
+    );
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [isExpanded, isProcessing, startListening, setProcessing, fetchStatus, showSnackbar, batch.jobId]);
 
   const handleDelete = async (jobItemId: number) => {
     showConfirm(
@@ -119,8 +140,7 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
     try {
       await processSingleJob(jobItemId);
       showSnackbar('Processing started', 'success');
-      setIsProcessing(true);
-      await fetchStatus();
+      setProcessing(true);
     } catch (error) {
       showSnackbar('Failed to process job: ' + (error as Error)?.message, 'error');
     } finally {
@@ -136,8 +156,7 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
         try {
           await processAllJobs(batch.jobId);
           showSnackbar('Processing all jobs started', 'success');
-          setIsProcessing(true);
-          await fetchStatus();
+          setProcessing(true);
         } catch (error) {
           showSnackbar('Failed to process all jobs: ' + (error as Error)?.message, 'error');
         }
@@ -157,9 +176,8 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
             Array.from(selectedJobIds).map((id) => processSingleJob(id)),
           );
           showSnackbar('Processing selected jobs started', 'success');
-          setIsProcessing(true);
+          setProcessing(true);
           setSelectedJobIds(new Set());
-          await fetchStatus();
         } catch (error) {
           showSnackbar('Failed to process selected jobs: ' + (error as Error)?.message, 'error');
         }
@@ -180,7 +198,6 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
           );
           showSnackbar('Selected jobs deleted successfully', 'success');
           setSelectedJobIds(new Set());
-          await fetchStatus();
         } catch (error) {
           showSnackbar('Failed to delete selected jobs: ' + (error as Error)?.message, 'error');
         }
@@ -210,7 +227,7 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
     job.sourceUrl.toLowerCase().includes(filterText.toLowerCase())
   ) || [];
 
-  const progress = status
+  const progressPercent = status
     ? (status.summary.completed / status.summary.total) * 100
     : 0;
 
@@ -266,14 +283,13 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
         </Box>
       </AccordionSummary>
       <AccordionDetails>
-
           <Box>
             {/* Progress Bar */}
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
               <Box sx={{ width: '100%', mr: 1 }}>
                 <LinearProgress
                   variant="determinate"
-                  value={progress}
+                  value={progressPercent}
                   sx={{
                     height: 10,
                     borderRadius: 5,
@@ -286,21 +302,20 @@ const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
               </Box>
               <Box sx={{ minWidth: 35 }}>
                 <Typography variant="body2" color="text.secondary">
-                  {`${Math.round(progress)}%`}
+                  {`${Math.round(progressPercent)}%`}
                 </Typography>
               </Box>
             </Box>
-
             {/* Processing Status */}
             {isProcessing && (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <CircularProgress size={16} />
-                <Typography variant="body2" color="primary">
-                  Processing jobs in the background...
-                </Typography>
+                {progress.length > 0 && (
+                  <Typography variant="body2">
+                    {progress[progress.length - 1]}
+                  </Typography>
+                )}
               </Box>
             )}
-
             {/* Job Actions */}
             <JobActions
               filterText={filterText}

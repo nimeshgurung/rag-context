@@ -1,0 +1,1 @@
+DROP INDEX "idx_embedding_jobs_batch";

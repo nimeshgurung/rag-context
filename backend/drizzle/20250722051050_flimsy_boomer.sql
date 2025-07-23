@@ -1,0 +1,1 @@
+CREATE INDEX "idx_embedding_jobs_batch" ON "embedding_jobs" USING btree ("job_id","library_id");

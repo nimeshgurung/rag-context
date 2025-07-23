@@ -7,9 +7,6 @@ import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { getScopeGlob } from './utils';
-// Remove the expensive LLM imports - we'll do this in phase 2
-// import { extractSemanticChunksFromMarkdown } from '../ai/extraction';
-// import { MarkdownHeaderTextSplitter } from './MarkdownHeaderTextSplitter';
 
 const turndownService = new TurndownService({
   codeBlockStyle: 'fenced',

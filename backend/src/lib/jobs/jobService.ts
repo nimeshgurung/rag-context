@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import { v4 as uuidv4 } from 'uuid';
 import slug from 'slug';
-import { spawn } from 'child_process';
 import PQueue from 'p-queue';
 import { db } from '../db';
 import { embeddingJobs } from '../schema.js';
@@ -9,6 +8,7 @@ import { eq, desc, sql, inArray } from 'drizzle-orm';
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
+import { sendEvent, closeConnection } from '../events';
 
 // Type for the raw embedding job row from database
 interface EmbeddingJobRow extends Record<string, unknown> {
@@ -291,6 +291,14 @@ class JobService {
     await ragService.processJob(job);
     await this.markJobAsCompleted(job.id);
     console.log(`Job ${job.id} completed successfully.`);
+
+    // Send progress event for this completed job
+    if (job.jobId) {
+      sendEvent(job.jobId, {
+        type: 'progress',
+        message: `Completed processing: ${job.sourceUrl}`,
+      });
+    }
   }
 
   /**
@@ -499,41 +507,34 @@ class JobService {
    * @returns Promise with success status and message about worker process
    *
    * Example: processAllJobs("abc-123-def-456") processes all pending URLs
-   *          from that crawl batch by spawning a background worker process
+   *          from that crawl batch by running in the same process with events
    */
   async processAllJobs(jobId: string) {
     try {
-      const workerCommand = 'npm';
-      const workerArgs = ['run', 'trigger-processing', '--', jobId];
+      console.log(`Starting job processing for jobId: ${jobId}`);
 
-      console.log(
-        `Spawning worker for jobId: ${jobId} with command: ${workerCommand} ${workerArgs.join(' ')}`,
-      );
-
-      const child = spawn(workerCommand, workerArgs, {
-        detached: true,
-        stdio: 'inherit',
+      setImmediate(() => {
+        this.processQueue(jobId).catch((error) => {
+          console.error(`Error in processQueue for jobId ${jobId}:`, error);
+          // Send error event if processing fails
+          sendEvent(jobId, {
+            type: 'progress',
+            message: `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
+          closeConnection(jobId, {
+            type: 'error',
+            message: 'Job processing failed',
+          });
+        });
       });
-
-      child.on('error', (err) => {
-        console.error(
-          `Failed to start worker process for jobId ${jobId}:`,
-          err,
-        );
-      });
-
-      child.unref();
 
       return {
         success: true,
-        message: `Embedding worker process for ${jobId} started in the background.`,
+        message: `Job processing for ${jobId} started.`,
       };
     } catch (error) {
-      console.error(
-        `Failed to start embedding worker process for ${jobId}:`,
-        error,
-      );
-      throw new Error('Failed to start embedding worker process.');
+      console.error(`Failed to start job processing for ${jobId}:`, error);
+      throw new Error('Failed to start job processing.');
     }
   }
 
@@ -647,10 +648,14 @@ class JobService {
    *
    * Example: processQueue("abc-123-def-456") processes only jobs from that crawl batch
    */
-  async processQueue(jobId?: string): Promise<void> {
+  async processQueue(jobId: string): Promise<void> {
     console.log('Starting embedding worker...');
     if (jobId) {
       console.log(`Processing jobs scoped to jobId: ${jobId}`);
+      sendEvent(jobId, {
+        type: 'progress',
+        message: 'Starting job processing...',
+      });
     }
     console.log(
       `Rate limit: ${this.RATE_LIMIT_PER_MINUTE}/minute, Concurrency: ${this.CONCURRENCY}`,
@@ -664,6 +669,11 @@ class JobService {
           console.log('No pending jobs. Waiting for 5 seconds...');
           if (jobId) {
             console.log('Finished processing for scoped jobId. Exiting.');
+            // Send completion event when all jobs are done
+            closeConnection(jobId, {
+              type: 'done',
+              message: 'All jobs completed successfully.',
+            });
             break;
           }
           await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -671,6 +681,14 @@ class JobService {
         }
 
         console.log(`Fetched ${jobs.length} jobs to process.`);
+
+        // Send progress event about batch being processed
+        if (jobId) {
+          sendEvent(jobId, {
+            type: 'progress',
+            message: `Processing batch of ${jobs.length} jobs...`,
+          });
+        }
 
         // Add jobs to queue with error handling
         jobs.forEach((job) => {
@@ -682,6 +700,14 @@ class JobService {
               const message =
                 error instanceof Error ? error.message : String(error);
               await this.markJobAsFailed(job.id, message);
+
+              // Send error event for this specific job
+              if (job.jobId) {
+                sendEvent(job.jobId, {
+                  type: 'progress',
+                  message: `Failed to process: ${job.sourceUrl} - ${message}`,
+                });
+              }
             }
           });
         });
@@ -697,6 +723,12 @@ class JobService {
           'An unexpected error occurred in the worker loop:',
           error,
         );
+        if (jobId) {
+          sendEvent(jobId, {
+            type: 'progress',
+            message: `Worker error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          });
+        }
         await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }

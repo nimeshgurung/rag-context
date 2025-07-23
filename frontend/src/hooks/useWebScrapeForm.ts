@@ -78,7 +78,7 @@ export const useWebScrapeForm = () => {
   };
 
   const reset = () => {
-    setState(initialState);
+    setState((prev: WebScrapeFormState) => ({ ...prev, ...initialState }));
   };
 
   const validate = (): boolean => {

@@ -37,15 +37,16 @@ const AddDocsModal: React.FC<AddDocsModalProps> = ({
     handleTabChange,
     handleApiSpecSubmit,
     handleWebScrapeSubmit,
+    onModalClose,
     isProcessing,
     progress,
-  } = useAddDocsModal(open, onClose, existingLibrary);
+  } = useAddDocsModal(existingLibrary);
   const apiSpecFormData = useApiSpecForm();
   const webScrapeFormData = useWebScrapeForm();
 
   const handleCloseModal = () => {
     if (!isProcessing) {
-      onClose();
+      onModalClose();
     }
   };
 
