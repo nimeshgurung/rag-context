@@ -1,6 +1,6 @@
 import React from 'react';
 import { TableRow, TableCell, Checkbox, Typography, Chip, Box, IconButton } from '@mui/material';
-import { PlayArrow, Delete } from '@mui/icons-material';
+import { PlayArrow, Delete, Refresh } from '@mui/icons-material';
 import { StatusChip } from './StatusChip';
 import type { JobItem } from '../../../types';
 
@@ -46,6 +46,17 @@ export const JobRow: React.FC<JobRowProps> = ({
             title="Process"
           >
             <PlayArrow fontSize="small" />
+          </IconButton>
+        )}
+        {(job.status === 'completed' || job.status === 'failed') && (
+          <IconButton
+            size="small"
+            onClick={onProcess}
+            disabled={isProcessing}
+            title="Reprocess"
+            color="primary"
+          >
+            <Refresh fontSize="small" />
           </IconButton>
         )}
         <IconButton

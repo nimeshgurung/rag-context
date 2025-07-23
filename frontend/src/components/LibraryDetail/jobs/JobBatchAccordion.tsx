@@ -80,6 +80,13 @@ export const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
   const isIndeterminate = displayJobs.some(job => selectedIds.has(job.id)) &&
     !isAllSelected;
 
+  // Calculate what types of jobs are selected
+  const selectedJobs = displayJobs.filter(job => selectedIds.has(job.id));
+  const hasSelectedPendingJobs = selectedJobs.some(job => job.status === 'pending');
+  const hasSelectedCompletedOrFailedJobs = selectedJobs.some(
+    job => job.status === 'completed' || job.status === 'failed'
+  );
+
   // Handle actions with confirmations
   const handleProcessAll = () => {
     showConfirm(
@@ -95,9 +102,13 @@ export const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
   const handleProcessSelected = () => {
     if (selectedIds.size === 0) return;
 
+    const actionText = hasSelectedCompletedOrFailedJobs
+      ? (hasSelectedPendingJobs ? 'process/reprocess' : 'reprocess')
+      : 'process';
+
     showConfirm(
       'Process Selected Jobs',
-      `Are you sure you want to process ${selectedIds.size} selected jobs?`,
+      `Are you sure you want to ${actionText} ${selectedIds.size} selected jobs?`,
       () => {
         processSelected(Array.from(selectedIds));
         clearSelection();
@@ -158,6 +169,8 @@ export const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
           selectedIds={selectedIds}
           isProcessing={isProcessing}
           hasPendingJobs={displayBatch.summary.pending > 0}
+          hasSelectedPendingJobs={hasSelectedPendingJobs}
+          hasSelectedCompletedOrFailedJobs={hasSelectedCompletedOrFailedJobs}
           onProcessSelected={handleProcessSelected}
           onDeleteSelected={handleDeleteSelected}
           onProcessAll={handleProcessAll}
