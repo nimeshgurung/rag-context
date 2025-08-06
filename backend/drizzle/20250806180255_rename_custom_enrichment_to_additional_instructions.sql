@@ -1,0 +1,1 @@
+ALTER TABLE "embedding_jobs" RENAME COLUMN "custom_enrichment_prompt" TO "additional_instructions";

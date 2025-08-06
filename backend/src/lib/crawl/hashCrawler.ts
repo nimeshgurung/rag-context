@@ -73,7 +73,7 @@ export async function crawlHash(options: CrawlOptions) {
             libraryName: source.name,
             libraryDescription,
             sourceUrl: currentUrl,
-            customEnrichmentPrompt: source.config.customEnrichmentPrompt,
+            additionalInstructions: source.config.additionalInstructions,
             preExecutionSteps: source.config.preExecutionSteps,
           };
 

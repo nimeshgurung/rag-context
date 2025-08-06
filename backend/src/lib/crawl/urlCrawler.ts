@@ -38,7 +38,7 @@ export async function crawlUrl(options: CrawlOptions) {
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          customEnrichmentPrompt: source.config.customEnrichmentPrompt,
+          additionalInstructions: source.config.additionalInstructions,
           preExecutionSteps: source.config.preExecutionSteps,
         };
 

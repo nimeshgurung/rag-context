@@ -84,7 +84,7 @@ export const embeddingJobs = pgTable(
     libraryDescription: text('library_description'),
     sourceUrl: text('source_url').notNull(),
 
-    customEnrichmentPrompt: text('custom_enrichment_prompt'), // Custom AI instructions
+    additionalInstructions: text('additional_instructions'), // Additional AI instructions
     preExecutionSteps: text('pre_execution_steps'), // JavaScript code to execute before scraping
     status: varchar('status', { length: 20 }).default('pending'), // 'pending' | 'processing' | 'completed' | 'failed'
     attempts: integer('attempts').default(0),

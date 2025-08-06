@@ -17,12 +17,12 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData, hideLibraryFiel
     description,
     startUrl,
     preExecutionSteps,
-    customEnrichmentPrompt,
+    additionalInstructions,
     setLibraryName,
     setDescription,
     setStartUrl,
     setPreExecutionSteps,
-    setCustomEnrichmentPrompt,
+    setAdditionalInstructions,
   } = formData;
 
   return (
@@ -74,10 +74,10 @@ const WebScrapeForm: React.FC<WebScrapeFormProps> = ({ formData, hideLibraryFiel
         size="small"
       />
       <TextField
-        label="Custom Enrichment Instructions"
-        value={customEnrichmentPrompt}
-        onChange={(e) => setCustomEnrichmentPrompt(e.target.value)}
-        helperText="Additional instructions for synthesizing code snippets (e.g., 'Focus on React hooks', 'Include TypeScript types')"
+        label="Additional Instructions"
+        value={additionalInstructions}
+        onChange={(e) => setAdditionalInstructions(e.target.value)}
+        helperText="Additional instructions for processing documentation (e.g., 'Focus on React hooks', 'Include TypeScript types')"
         multiline
         rows={3}
         size="small"

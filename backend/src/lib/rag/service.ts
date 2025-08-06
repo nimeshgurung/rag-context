@@ -163,6 +163,7 @@ class RagService {
       try {
         const semanticChunks = await extractSemanticChunksFromMarkdown(
           section.pageContent,
+          job.additionalInstructions, // additional instructions
         );
         const formattedChunks = semanticChunks.map((chunk) => {
           const snippetsFormatted = chunk.snippets

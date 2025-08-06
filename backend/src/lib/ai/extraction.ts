@@ -42,13 +42,15 @@ const extractionSchema = z.object({
  * The goal is to keep related content, especially code examples and their explanations, together.
  * @param {string} markdownContent - The raw markdown content of the document.
  * @param {LanguageModel} [model] - The language model to use for extraction.
+ * @param {string} [additionalInstructions] - Additional instructions from the user to customize the chunking process.
  * @returns {Promise<z.infer<typeof semanticChunkSchema>[]>} A promise that resolves to an array of semantic chunks.
  */
 export async function extractSemanticChunksFromMarkdown(
   markdownContent: string,
+  additionalInstructions?: string,
   model?: LanguageModel,
 ): Promise<z.infer<typeof semanticChunkSchema>[]> {
-  const systemPrompt = `You are an expert in technical documentation analysis. Your task is to split a code documentation markdown into semantic chunks, where each chunk ideally represents a single concept followed by code examples or API Docs.
+  let systemPrompt = `You are an expert in technical documentation analysis. Your task is to split a code documentation markdown into semantic chunks, where each chunk ideally represents a single concept followed by code examples or API Docs.
 
   **CRITICAL: Context Preservation**
   - **Include ALL explanatory text** that provides context for code blocks - this includes setup instructions, parameter explanations, usage notes, warnings, and follow-up explanations
@@ -94,6 +96,15 @@ export async function extractSemanticChunksFromMarkdown(
   - It's better to have one large chunk with complete context than multiple small chunks missing context
   - Only split when there's a clear conceptual boundary between different functionalities
   `;
+
+  // Add additional instructions if provided
+  if (additionalInstructions && additionalInstructions.trim()) {
+    systemPrompt += `
+
+  **ADDITIONAL INSTRUCTIONS:**
+  ${additionalInstructions.trim()}
+  `;
+  }
 
   const prompt = `**Markdown Document to Chunk:**
 ---

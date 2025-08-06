@@ -50,7 +50,7 @@ export type WebScrapeSource = {
   startUrl: string;
   config: {
     preExecutionSteps?: string;
-    customEnrichmentPrompt?: string;
+    additionalInstructions?: string;
   };
 };
 

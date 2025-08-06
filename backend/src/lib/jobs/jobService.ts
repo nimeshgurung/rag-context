@@ -19,7 +19,7 @@ interface EmbeddingJobRow extends Record<string, unknown> {
   library_name: string | null;
   library_description: string | null;
   source_url: string;
-  custom_enrichment_prompt: string | null;
+  additional_instructions: string | null;
   pre_execution_steps: string | null;
 }
 
@@ -30,7 +30,7 @@ export interface EmbeddingJobPayload {
   libraryName: string;
   libraryDescription: string;
   sourceUrl: string;
-  customEnrichmentPrompt?: string;
+  additionalInstructions?: string;
   preExecutionSteps?: string;
 }
 
@@ -173,7 +173,7 @@ class JobService {
           libraryDescription: job.libraryDescription,
           sourceUrl: job.sourceUrl,
 
-          customEnrichmentPrompt: job.customEnrichmentPrompt || null,
+          additionalInstructions: job.additionalInstructions || null,
           preExecutionSteps: job.preExecutionSteps || null,
         }));
 
@@ -240,7 +240,7 @@ class JobService {
           libraryName: row.library_name || '',
           libraryDescription: row.library_description || '',
           sourceUrl: row.source_url,
-          customEnrichmentPrompt: row.custom_enrichment_prompt || undefined,
+          additionalInstructions: row.additional_instructions || undefined,
         }));
 
         if (jobs.length > 0) {
@@ -395,7 +395,7 @@ class JobService {
     libraryName: string,
     libraryDescription: string,
     startUrl: string,
-    customEnrichmentPrompt?: string,
+    additionalInstructions?: string,
   ): Promise<string> {
     const jobId = uuidv4();
     const libraryId = slug(libraryName);
@@ -414,7 +414,7 @@ class JobService {
         startUrl,
         type: 'web-scrape',
         config: {
-          customEnrichmentPrompt,
+          additionalInstructions,
         },
       };
 
@@ -536,11 +536,11 @@ class JobService {
       const jobPayload: EmbeddingJobPayload = {
         id: job.id, // Include the job ID
         jobId: job.jobId || undefined,
-        libraryId: job.libraryId || '',
-        libraryName: job.libraryName || '',
-        libraryDescription: job.libraryDescription || '',
-        sourceUrl: job.sourceUrl || '',
-        customEnrichmentPrompt: job.customEnrichmentPrompt || undefined,
+        libraryId: job.libraryId,
+        libraryName: job.libraryName,
+        libraryDescription: job.libraryDescription,
+        sourceUrl: job.sourceUrl,
+        additionalInstructions: job.additionalInstructions || undefined,
         preExecutionSteps: job.preExecutionSteps || undefined,
       };
 

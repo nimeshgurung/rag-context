@@ -28,7 +28,7 @@ export const useWebScrapeSubmit = (
       description,
       startUrl,
       preExecutionSteps,
-      customEnrichmentPrompt,
+      additionalInstructions,
     } = formData;
 
     const source: WebScrapeSource = {
@@ -38,7 +38,7 @@ export const useWebScrapeSubmit = (
       startUrl,
       config: {
         preExecutionSteps,
-        customEnrichmentPrompt,
+        additionalInstructions,
       },
     };
 

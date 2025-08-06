@@ -5,7 +5,7 @@ export interface WebScrapeFormState {
   description: string;
   startUrl: string;
   preExecutionSteps: string;
-  customEnrichmentPrompt: string;
+  additionalInstructions: string;
 }
 
 export interface WebScrapeFormActions {
@@ -13,7 +13,7 @@ export interface WebScrapeFormActions {
   setDescription: (description: string) => void;
   setStartUrl: (url: string) => void;
   setPreExecutionSteps: (steps: string) => void;
-  setCustomEnrichmentPrompt: (prompt: string) => void;
+  setAdditionalInstructions: (instructions: string) => void;
   reset: () => void;
   validate: () => boolean;
 }
@@ -23,7 +23,7 @@ const initialState: WebScrapeFormState = {
   description: '',
   startUrl: '',
   preExecutionSteps: '',
-  customEnrichmentPrompt: '',
+  additionalInstructions: '',
 };
 
 export const useWebScrapeForm = () => {
@@ -45,8 +45,8 @@ export const useWebScrapeForm = () => {
     setState((prev: WebScrapeFormState) => ({ ...prev, preExecutionSteps }));
   };
 
-  const setCustomEnrichmentPrompt = (customEnrichmentPrompt: string) => {
-    setState((prev: WebScrapeFormState) => ({ ...prev, customEnrichmentPrompt }));
+  const setAdditionalInstructions = (additionalInstructions: string) => {
+    setState((prev: WebScrapeFormState) => ({ ...prev, additionalInstructions }));
   };
 
   const reset = () => {
@@ -63,7 +63,7 @@ export const useWebScrapeForm = () => {
     setDescription,
     setStartUrl,
     setPreExecutionSteps,
-    setCustomEnrichmentPrompt,
+    setAdditionalInstructions,
     reset,
     validate,
   };
