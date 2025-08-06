@@ -124,7 +124,7 @@ class RagService {
       '../ai/extraction'
     );
     const { MarkdownHeaderTextSplitter } = await import(
-      '../crawl/MarkdownHeaderTextSplitter'
+      '../crawl/utils/MarkdownHeaderTextSplitter'
     );
 
     await this.upsertLibrary({

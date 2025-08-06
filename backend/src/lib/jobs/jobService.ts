@@ -9,7 +9,7 @@ import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
 import { sendEvent } from '../events';
-import { fetchMarkdownForUrl } from '../crawl/contentFetcher';
+import { fetchMarkdownForUrl } from '../crawl/utils/contentFetcher';
 
 // Type for the raw embedding job row from database
 interface EmbeddingJobRow extends Record<string, unknown> {
