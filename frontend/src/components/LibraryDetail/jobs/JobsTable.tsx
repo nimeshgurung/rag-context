@@ -53,7 +53,7 @@ export const JobsTable: React.FC<JobsTableProps> = ({
             />
           </TableCell>
           <TableCell>URL</TableCell>
-          <TableCell>Type</TableCell>
+
           <TableCell>Status</TableCell>
           <TableCell>Actions</TableCell>
         </TableRow>

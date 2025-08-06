@@ -191,7 +191,7 @@ export async function getAllJobsForLibrary(libraryId: string): Promise<{
       status: string;
       processedAt: string | null;
       errorMessage: string | null;
-      scrapeType: string;
+
     }>;
   }>;
 }> {

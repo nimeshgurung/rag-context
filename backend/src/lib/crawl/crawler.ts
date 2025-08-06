@@ -7,13 +7,5 @@ export async function crawlSource(
   libraryId: string,
   libraryDescription: string,
 ) {
-  const { scrapeType } = source.config;
-
-  await crawlWithHashSupport(
-    jobId,
-    source,
-    libraryId,
-    libraryDescription,
-    scrapeType,
-  );
+  await crawlWithHashSupport(jobId, source, libraryId, libraryDescription);
 }

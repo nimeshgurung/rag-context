@@ -28,7 +28,6 @@ export const useWebScrapeSubmit = (
       description,
       startUrl,
       customEnrichmentPrompt,
-      scrapeType,
       contentSelector,
       codeSelector,
       maxDepth,
@@ -40,7 +39,6 @@ export const useWebScrapeSubmit = (
       description,
       startUrl,
       config: {
-        scrapeType,
         contentSelector,
         codeSelector,
         maxDepth: maxDepth || undefined,

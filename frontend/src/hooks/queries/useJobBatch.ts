@@ -46,7 +46,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
           ...job,
           processedAt: null,
           errorMessage: null,
-          scrapeType: 'documentation' // Default, should come from API
+
         }))
       };
       return jobBatchData;

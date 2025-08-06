@@ -4,7 +4,6 @@ export interface JobItem {
   status: string;
   processedAt: string | null;
   errorMessage: string | null;
-  scrapeType: string;
 }
 
 export interface JobSummary {

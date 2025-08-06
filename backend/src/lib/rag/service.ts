@@ -1,8 +1,7 @@
 import 'dotenv/config';
 import { embed, embedMany } from 'ai';
 import { models } from '../ai/models';
-import { EnrichedItem } from '../types';
-import { getEnrichedDataFromLLM } from '../ai/enrichment';
+
 import { EmbeddingJobPayload } from '../jobs/jobService';
 import { createHash } from 'crypto';
 import { db } from '../db';
@@ -107,11 +106,12 @@ class RagService {
   /**
    * Ingests documentation chunks from a job.
    * Phase 2: Process raw markdown stored during crawling into semantic chunks and embeddings.
-   * @param job - The embedding job containing raw markdown data.
+   * @param job - The embedding job containing metadata.
+   * @param markdown - The markdown content to process.
    */
-  async ingestDocumentation(job: EmbeddingJobPayload) {
+  async ingestDocumentation(job: EmbeddingJobPayload, markdown: string) {
     // Phase 2: Process raw markdown into semantic chunks
-    if (!job.contextMarkdown || job.contextMarkdown.trim().length === 0) {
+    if (!markdown || markdown.trim().length === 0) {
       console.log('No raw markdown to process');
       return;
     }
@@ -134,11 +134,11 @@ class RagService {
     });
 
     console.log(
-      `Processing ${job.contextMarkdown.length} characters of markdown for ${job.sourceUrl}`,
+      `Processing ${markdown.length} characters of markdown for ${job.sourceUrl}`,
     );
 
     // Analyze markdown structure with AI to determine optimal header levels
-    const headerAnalysis = await analyzeMarkdownHeaders(job.contextMarkdown);
+    const headerAnalysis = await analyzeMarkdownHeaders(markdown);
 
     const headerSplitter = new MarkdownHeaderTextSplitter(
       headerAnalysis.recommendedHeaderLevels.map((h) => [
@@ -155,7 +155,7 @@ class RagService {
       `Using AI-recommended headers: ${headerAnalysis.recommendedHeaderLevels.map((h) => h.symbol).join(', ')} (confidence: ${headerAnalysis.confidence})`,
     );
 
-    const sections = headerSplitter.splitText(job.contextMarkdown);
+    const sections = headerSplitter.splitText(markdown);
     let allChunks: string[] = [];
 
     // Process each section with LLM to extract semantic chunks
@@ -232,79 +232,6 @@ class RagService {
   }
 
   /**
-   * Ingests code snippets from a job by enriching them with LLM.
-   * It first ensures the library exists, then enriches raw snippets with LLM,
-   * creates embeddings for each code snippet and upserts them into the 'embeddings' index.
-   * @param job - The embedding job containing code snippets data.
-   */
-  async ingestCodeSnippets(job: EmbeddingJobPayload) {
-    if (!job.rawSnippets || job.rawSnippets.length === 0) {
-      console.log('No code snippets to ingest');
-      return;
-    }
-
-    // Clean up existing embeddings for this URL to prevent duplicates
-    await this.deleteExistingEmbeddings(job.libraryId, job.sourceUrl);
-
-    // Enrich raw snippets with LLM
-    const enrichedItems: EnrichedItem[] = [];
-    for (const snippet of job.rawSnippets) {
-      const enrichedData = await getEnrichedDataFromLLM(
-        snippet,
-        job.contextMarkdown || '',
-        job.customEnrichmentPrompt,
-      );
-      if (enrichedData) {
-        enrichedItems.push(enrichedData);
-      }
-    }
-
-    if (enrichedItems.length === 0) {
-      console.log('No enriched items to ingest');
-      return;
-    }
-    await this.upsertLibrary({
-      id: job.libraryId,
-      name: job.libraryName,
-      description: job.libraryDescription,
-    });
-
-    const { embeddings: embeddingVectors } = await embedMany({
-      model: models['text-embedding-3-small'],
-      values: enrichedItems.map((item) => item.code),
-    });
-
-    // Prepare batch data for efficient insert
-    const embeddingData = enrichedItems.map((item, i) => ({
-      vectorId: this.generateDeterministicId(
-        job.libraryId,
-        job.sourceUrl,
-        item.code,
-      ),
-      libraryId: job.libraryId,
-      jobId: job.id, // Link to the embedding job record
-      contentType: 'code-example' as const,
-      title: item.title,
-      originalText: item.code,
-      sourceUrl: job.sourceUrl,
-      embedding: embeddingVectors[i],
-    }));
-
-    // Batch upsert - much more efficient than individual inserts
-    await db
-      .insert(embeddings)
-      .values(embeddingData)
-      .onConflictDoUpdate({
-        target: embeddings.vectorId,
-        set: {
-          title: sql.raw(`excluded.${embeddings.title.name}`),
-          originalText: sql.raw(`excluded.${embeddings.originalText.name}`),
-          embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
-        },
-      });
-  }
-
-  /**
    * Ingests structured API specification data for a specific library.
    * This method is specifically designed for handling parsed API specifications
    * that have been converted to structured chunks with metadata.
@@ -362,67 +289,21 @@ class RagService {
   }
 
   /**
-   * Extracts code snippets from markdown content.
-   * Used for code-type jobs where we fetch markdown and need to extract code blocks.
+   * Process an embedding job with content.
+   * All web scraping is now documentation-based with LLM code extraction.
    */
-  private extractCodeSnippetsFromMarkdown(markdown: string): string[] {
-    const codeBlockRegex = /```[\s\S]*?```/g;
-    const matches = markdown.match(codeBlockRegex) || [];
+  async processJob(job: EmbeddingJobPayload, content: string): Promise<void> {
+    console.log(`Processing documentation job for ${job.sourceUrl}`);
 
-    return matches
-      .map((block) => {
-        // Remove the ``` markers and language identifier
-        const lines = block.split('\n');
-        // Remove first line (```language) and last line (```)
-        return lines.slice(1, -1).join('\n');
-      })
-      .filter((snippet) => snippet.trim().length > 0);
-  }
-
-  /**
-   * Process an embedding job. Routes to appropriate handler based on scrapeType.
-   * Now handles both documentation and code jobs with markdown content.
-   */
-  async processJob(job: EmbeddingJobPayload): Promise<void> {
-    console.log(`Processing ${job.scrapeType} job for ${job.sourceUrl}`);
-
-    // Ensure we have markdown content for both job types
-    if (!job.contextMarkdown || job.contextMarkdown.trim().length === 0) {
-      console.log(`Job has no markdown content, skipping processing.`);
+    // Ensure we have content
+    if (!content || content.trim().length === 0) {
+      console.log(`Job has no content, skipping processing.`);
       return;
     }
 
-    switch (job.scrapeType) {
-      case 'documentation':
-        // Documentation jobs process markdown directly
-        await this.ingestDocumentation(job);
-        break;
-
-      case 'code':
-        // Code jobs need to extract snippets from markdown first
-        const codeSnippets = this.extractCodeSnippetsFromMarkdown(
-          job.contextMarkdown,
-        );
-
-        if (codeSnippets.length === 0) {
-          console.log(
-            `No code snippets found in markdown, skipping processing.`,
-          );
-          return;
-        }
-
-        // Update job with extracted snippets
-        const codeJob = {
-          ...job,
-          rawSnippets: codeSnippets,
-        };
-
-        await this.ingestCodeSnippets(codeJob);
-        break;
-
-      default:
-        console.warn(`Unknown scrape type: ${job.scrapeType}`);
-    }
+    // All web scraping is now documentation-based
+    // The LLM will extract code snippets during processing
+    await this.ingestDocumentation(job, content);
   }
 }
 

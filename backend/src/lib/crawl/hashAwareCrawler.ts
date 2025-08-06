@@ -16,7 +16,6 @@ interface CrawlOptions {
   source: WebScrapeSource;
   libraryId: string;
   libraryDescription: string;
-  scrapeType: 'documentation' | 'code';
 }
 
 /**
@@ -171,7 +170,7 @@ async function extractHashRoutes(
  * Crawls a hash-based documentation site
  */
 async function crawlHashBasedSite(options: CrawlOptions) {
-  const { jobId, source, libraryId, libraryDescription, scrapeType } = options;
+  const { jobId, source, libraryId, libraryDescription } = options;
   const { startUrl } = source;
 
   const processedUrls = new Set<string>();
@@ -195,7 +194,7 @@ async function crawlHashBasedSite(options: CrawlOptions) {
 
           sendEvent(jobId, {
             type: 'progress',
-            message: `Discovering ${scrapeType} page: ${currentUrl}`,
+            message: `Discovering documentation page: ${currentUrl}`,
           });
 
           // Wait for content to load (SPAs often load content dynamically)
@@ -236,9 +235,7 @@ async function crawlHashBasedSite(options: CrawlOptions) {
             libraryName: source.name,
             libraryDescription,
             sourceUrl: currentUrl,
-            rawSnippets: [],
-            contextMarkdown: undefined,
-            scrapeType,
+
             customEnrichmentPrompt: source.config.customEnrichmentPrompt,
           };
 
@@ -296,7 +293,7 @@ async function crawlHashBasedSite(options: CrawlOptions) {
  * Crawls a traditional multi-page documentation site
  */
 async function crawlTraditionalSite(options: CrawlOptions) {
-  const { jobId, source, libraryId, libraryDescription, scrapeType } = options;
+  const { jobId, source, libraryId, libraryDescription } = options;
   const { startUrl } = source;
 
   const crawlerConfig = new Configuration({
@@ -317,14 +314,14 @@ async function crawlTraditionalSite(options: CrawlOptions) {
   const crawler = new PlaywrightCrawler(
     {
       maxRequestsPerCrawl: source.config.maxDepth || 1000,
-      maxConcurrency: scrapeType === 'code' ? 5 : 1,
+      maxConcurrency: 1, // Documentation scraping uses single concurrency
 
       async requestHandler({ request, enqueueLinks, log }) {
         log.info(`[Job ${jobId}] Discovering URL: ${request.url}`);
 
         sendEvent(jobId, {
           type: 'progress',
-          message: `Discovering ${scrapeType} page: ${request.url}`,
+          message: `Discovering documentation page: ${request.url}`,
         });
 
         // Create job for this URL
@@ -334,9 +331,6 @@ async function crawlTraditionalSite(options: CrawlOptions) {
           libraryName: source.name,
           libraryDescription,
           sourceUrl: request.url,
-          rawSnippets: [],
-          contextMarkdown: undefined,
-          scrapeType,
           customEnrichmentPrompt: source.config.customEnrichmentPrompt,
         };
 
@@ -381,14 +375,12 @@ export async function crawlWithHashSupport(
   source: WebScrapeSource,
   libraryId: string,
   libraryDescription: string,
-  scrapeType: 'documentation' | 'code',
 ) {
   const options: CrawlOptions = {
     jobId,
     source,
     libraryId,
     libraryDescription,
-    scrapeType,
   };
 
   // Check if we should use hash-based crawling

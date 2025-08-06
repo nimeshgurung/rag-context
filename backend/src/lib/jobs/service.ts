@@ -5,14 +5,12 @@ export async function startCrawlJob(
   libraryName: string,
   libraryDescription: string,
   startUrl: string,
-  scrapeType: 'code' | 'documentation',
   customEnrichmentPrompt?: string,
 ) {
   return await jobService.startCrawlJob(
     libraryName,
     libraryDescription,
     startUrl,
-    scrapeType,
     customEnrichmentPrompt,
   );
 }

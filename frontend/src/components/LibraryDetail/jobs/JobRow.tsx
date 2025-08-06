@@ -28,9 +28,7 @@ export const JobRow: React.FC<JobRowProps> = ({
         {job.sourceUrl}
       </Typography>
     </TableCell>
-    <TableCell>
-      <Chip label={job.scrapeType} size="small" variant="outlined" />
-    </TableCell>
+
     <TableCell>
       <StatusChip status={job.status} />
     </TableCell>

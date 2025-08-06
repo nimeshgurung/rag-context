@@ -9,10 +9,7 @@ import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
 import { ragService } from '../rag/service';
 import { sendEvent } from '../events';
-import {
-  fetchMarkdownForUrl,
-  fetchCodeSnippetsForUrl,
-} from '../crawl/contentFetcher';
+import { fetchMarkdownForUrl } from '../crawl/contentFetcher';
 
 // Type for the raw embedding job row from database
 interface EmbeddingJobRow extends Record<string, unknown> {
@@ -22,9 +19,6 @@ interface EmbeddingJobRow extends Record<string, unknown> {
   library_name: string | null;
   library_description: string | null;
   source_url: string;
-  raw_snippets: unknown;
-  context_markdown: string | null;
-  scrape_type: string | null;
   custom_enrichment_prompt: string | null;
 }
 
@@ -35,9 +29,6 @@ export interface EmbeddingJobPayload {
   libraryName: string;
   libraryDescription: string;
   sourceUrl: string;
-  rawSnippets: string[];
-  contextMarkdown?: string;
-  scrapeType: 'code' | 'documentation';
   customEnrichmentPrompt?: string;
 }
 
@@ -50,7 +41,6 @@ export interface JobBatch {
     status: string;
     processedAt: Date | null;
     errorMessage: string | null;
-    scrapeType: string;
   }[];
   summary?: {
     total: number;
@@ -180,9 +170,7 @@ class JobService {
           libraryName: job.libraryName,
           libraryDescription: job.libraryDescription,
           sourceUrl: job.sourceUrl,
-          rawSnippets: job.rawSnippets,
-          contextMarkdown: job.contextMarkdown || null,
-          scrapeType: job.scrapeType,
+
           customEnrichmentPrompt: job.customEnrichmentPrompt || null,
         }));
 
@@ -249,10 +237,6 @@ class JobService {
           libraryName: row.library_name || '',
           libraryDescription: row.library_description || '',
           sourceUrl: row.source_url,
-          rawSnippets: Array.isArray(row.raw_snippets) ? row.raw_snippets : [],
-          contextMarkdown: row.context_markdown || undefined,
-          scrapeType:
-            (row.scrape_type as 'code' | 'documentation') || 'documentation',
           customEnrichmentPrompt: row.custom_enrichment_prompt || undefined,
         }));
 
@@ -332,14 +316,12 @@ class JobService {
       // Update status to processing
       await this.markJobAsProcessing(job.id);
 
-      // Fetch fresh content from the URL based on scrape type
+      // All web scraping is now documentation-based
+
+      // Fetch fresh content from the URL (all web scraping is documentation-based)
       let fetchResult;
       try {
-        if (job.scrapeType === 'documentation') {
-          fetchResult = await fetchMarkdownForUrl(job.sourceUrl);
-        } else {
-          fetchResult = await fetchCodeSnippetsForUrl(job.sourceUrl);
-        }
+        fetchResult = await fetchMarkdownForUrl(job.sourceUrl);
 
         if (!fetchResult.success) {
           isFetchError = true;
@@ -368,19 +350,11 @@ class JobService {
         return;
       }
 
-      // Update job payload with fresh content
-      const freshJobPayload: EmbeddingJobPayload = {
-        ...job,
-        id: job.id, // Include the job ID
-        contextMarkdown: fetchResult.markdown!,
-        rawSnippets: [], // Will be extracted from markdown if needed
-      };
-
       console.log(
-        `Processing ${job.scrapeType} job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
+        `Processing documentation job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
       );
 
-      await ragService.processJob(freshJobPayload);
+      await ragService.processJob(job, fetchResult.markdown!);
       await this.markJobAsCompleted(job.id);
       console.log(`Job ${job.id} completed successfully.`);
 
@@ -415,7 +389,6 @@ class JobService {
     libraryName: string,
     libraryDescription: string,
     startUrl: string,
-    scrapeType: 'code' | 'documentation',
     customEnrichmentPrompt?: string,
   ): Promise<string> {
     const jobId = uuidv4();
@@ -435,7 +408,6 @@ class JobService {
         startUrl,
         type: 'web-scrape',
         config: {
-          scrapeType,
           customEnrichmentPrompt,
         },
       };
@@ -533,13 +505,8 @@ class JobService {
       // Update status to processing
       await this.markJobAsProcessing(job.id);
 
-      // Fetch fresh content from the URL based on scrape type
-      let fetchResult;
-      if (job.scrapeType === 'documentation') {
-        fetchResult = await fetchMarkdownForUrl(job.sourceUrl || '');
-      } else {
-        fetchResult = await fetchCodeSnippetsForUrl(job.sourceUrl || '');
-      }
+      // Fetch fresh content from the URL (all web scraping is documentation-based)
+      const fetchResult = await fetchMarkdownForUrl(job.sourceUrl || '');
 
       if (!fetchResult.success) {
         throw new Error(`Failed to fetch content: ${fetchResult.error}`);
@@ -565,18 +532,14 @@ class JobService {
         libraryName: job.libraryName || '',
         libraryDescription: job.libraryDescription || '',
         sourceUrl: job.sourceUrl || '',
-        rawSnippets: [], // Will be extracted from markdown if needed
-        contextMarkdown: fetchResult.markdown!,
-        scrapeType:
-          (job.scrapeType as 'code' | 'documentation') || 'documentation',
         customEnrichmentPrompt: job.customEnrichmentPrompt || undefined,
       };
 
       console.log(
-        `Processing ${job.scrapeType} job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
+        `Processing documentation job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
       );
 
-      await ragService.processJob(jobPayload);
+      await ragService.processJob(jobPayload, fetchResult.markdown!);
       await this.markJobAsCompleted(job.id);
 
       return {
@@ -675,7 +638,6 @@ class JobService {
         createdAt: embeddingJobs.createdAt,
         processedAt: embeddingJobs.processedAt,
         errorMessage: embeddingJobs.errorMessage,
-        scrapeType: embeddingJobs.scrapeType,
       })
       .from(embeddingJobs)
       .where(eq(embeddingJobs.libraryId, libraryId))
@@ -699,7 +661,6 @@ class JobService {
         status: row.status || 'pending',
         processedAt: row.processedAt,
         errorMessage: row.errorMessage,
-        scrapeType: row.scrapeType || 'documentation',
       });
     }
 
