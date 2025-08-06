@@ -164,7 +164,10 @@ class RagService {
     );
 
     const sections = headerSplitter.splitText(markdown);
-    let allChunks: string[] = [];
+    const allChunks: Array<{
+      content: string;
+      metadata: Record<string, unknown>;
+    }> = [];
 
     // Process each section with LLM to extract semantic chunks
     for (const section of sections) {
@@ -173,7 +176,8 @@ class RagService {
           section.pageContent,
           job.additionalInstructions, // additional instructions
         );
-        const formattedChunks = semanticChunks.map((chunk) => {
+
+        for (const chunk of semanticChunks) {
           const snippetsFormatted = chunk.snippets
             .map((s) => {
               if (s.language === 'text') {
@@ -183,9 +187,19 @@ class RagService {
               }
             })
             .join('\n\n');
-          return `Title: ${chunk.title}\nDescription: ${chunk.description}\n\n${snippetsFormatted}`;
-        });
-        allChunks = allChunks.concat(formattedChunks);
+
+          const formattedContent = `Title: ${chunk.title}\nDescription: ${chunk.description}\n\n${snippetsFormatted}`;
+
+          allChunks.push({
+            content: formattedContent,
+            metadata: {
+              title: chunk.title,
+              description: chunk.description,
+              snippetCount: chunk.snippets.length,
+              languages: [...new Set(chunk.snippets.map((s) => s.language))],
+            },
+          });
+        }
       } catch (error) {
         console.error(`Error processing section from ${job.sourceUrl}:`, error);
         // Continue with other sections instead of failing completely
@@ -204,7 +218,7 @@ class RagService {
     // Create embeddings for the processed chunks
     const { embeddings: embeddingVectors } = await embedMany({
       model: models['text-embedding-3-small'],
-      values: allChunks,
+      values: allChunks.map((c) => c.content),
     });
 
     // Prepare batch data for efficient insert
@@ -212,15 +226,15 @@ class RagService {
       vectorId: this.generateDeterministicId(
         job.libraryId,
         job.sourceUrl,
-        chunk,
+        chunk.content,
       ),
       libraryId: job.libraryId,
       jobId: job.id, // Link to the embedding job record
       contentType: 'documentation' as const,
-      title: null,
-      originalText: chunk,
+      content: chunk.content,
       sourceUrl: job.sourceUrl,
       embedding: embeddingVectors[i],
+      metadata: chunk.metadata,
     }));
 
     // Batch upsert - much more efficient than individual inserts
@@ -230,8 +244,9 @@ class RagService {
       .onConflictDoUpdate({
         target: embeddings.vectorId,
         set: {
-          originalText: sql.raw(`excluded.${embeddings.originalText.name}`),
+          content: sql.raw(`excluded.${embeddings.content.name}`),
           embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
+          metadata: sql.raw(`excluded.${embeddings.metadata.name}`),
         },
       });
 
@@ -277,10 +292,10 @@ class RagService {
       vectorId: item.id,
       libraryId: libraryInfo.libraryId,
       contentType: 'api-spec' as const,
-      title: (item.metadata.title as string) || null,
-      originalText: item.text,
+      content: item.text,
       sourceUrl: sourceUrl,
       embedding: embeddingVectors[i],
+      metadata: item.metadata, // Store metadata including title if available
     }));
 
     // Batch upsert - much more efficient than individual inserts
@@ -290,9 +305,9 @@ class RagService {
       .onConflictDoUpdate({
         target: embeddings.vectorId,
         set: {
-          title: sql.raw(`excluded.${embeddings.title.name}`),
-          originalText: sql.raw(`excluded.${embeddings.originalText.name}`),
+          content: sql.raw(`excluded.${embeddings.content.name}`),
           embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
+          metadata: sql.raw(`excluded.${embeddings.metadata.name}`),
         },
       });
   }

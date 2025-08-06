@@ -67,13 +67,12 @@ export async function extractSemanticChunksFromMarkdown(
      - \`description\`: Comprehensive summary (2-5 sentences) including ALL setup context, explanations, warnings, usage notes, and contextual information
      - \`snippets\`: Code blocks and API documentation, with "text" snippets ONLY for transition explanations between multiple code blocks
 
-  **Snippet Guidelines:**
-  - Use "text" ONLY for transition explanations between multiple code blocks or API docs
-  - Use "APIDOCS" for API documentation like function signatures, parameters, return types, and API endpoint specifications
-  - Use appropriate language identifier for actual code blocks
-  - DO NOT create chunks with only text snippets - these provide no value
-  - DO NOT include text snippets when there's only one code block - the description captures sufficient context
-  - Only include text snippets when they explain transitions, differences, or connections between multiple code/API snippets
+  **CRITICAL - Snippet Format Requirements:**
+  - EVERY snippet MUST be a JSON object with exactly 2 fields: {"language": "...", "code": "..."}
+  - For code blocks: {"language": "typescript", "code": "actual code here"}
+  - For explanatory text: {"language": "text", "code": "explanation text here"}
+  - For API docs: {"language": "APIDOCS", "code": "API documentation here"}
+  - NEVER put raw strings in the snippets array - always use the object format
 
   **Each concept should include:**
   - title: A concise, action-oriented summary of the concept (3-8 words)
@@ -112,12 +111,50 @@ ${markdownContent}
 ---
 `;
 
-  const { chunks } = await generateObjectFromPrompt({
-    prompt,
-    systemPrompt,
-    schema: extractionSchema,
-    model,
-  });
+  try {
+    const { chunks } = await generateObjectFromPrompt({
+      prompt,
+      systemPrompt,
+      schema: extractionSchema,
+      model,
+    });
 
-  return chunks;
+    // Validate and fix any malformed snippets
+    const validatedChunks = chunks.map((chunk) => ({
+      ...chunk,
+      snippets: chunk.snippets.map((snippet) => {
+        // If snippet is a string instead of object, wrap it properly
+        if (typeof snippet === 'string') {
+          return {
+            language: 'text',
+            code: snippet,
+          };
+        }
+        return snippet;
+      }),
+    }));
+
+    return validatedChunks;
+  } catch (error) {
+    console.error(
+      'AI extraction failed, falling back to simple chunking:',
+      error instanceof Error ? error.message : String(error),
+    );
+
+    // Fallback: Create a single chunk with the entire content
+    return [
+      {
+        title: 'Document Content',
+        description: 'Full document content (AI extraction failed)',
+        snippets: [
+          {
+            language: 'text',
+            code:
+              markdownContent.substring(0, 2000) +
+              (markdownContent.length > 2000 ? '...' : ''),
+          },
+        ],
+      },
+    ];
+  }
 }

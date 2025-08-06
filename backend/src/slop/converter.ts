@@ -29,7 +29,7 @@ export function convertToSlopChunks(
     id: generateDeterministicId(libraryId, 'API_OVERVIEW', overviewText),
     libraryId,
     contentType: 'API_OVERVIEW',
-    originalText: overviewText,
+    content: overviewText,
     metadata: {
       title: spec.info.title,
       version: spec.info.version,
@@ -72,7 +72,7 @@ export function convertToSlopChunks(
               ),
               libraryId,
               contentType: 'OPERATION',
-              originalText: operationText,
+              content: operationText,
               metadata: {
                 path,
                 method: method.toUpperCase(),
@@ -104,7 +104,7 @@ export function convertToSlopChunks(
           ),
           libraryId,
           contentType: 'SCHEMA_DEFINITION',
-          originalText: schemaText,
+          content: schemaText,
           metadata: {
             schemaName,
           },

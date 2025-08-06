@@ -71,6 +71,20 @@
       "when": 1754506688990,
       "tag": "20250806185808_remove_redundant_embedding_jobs_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1754514907712,
+      "tag": "20250806211507_simplify_embeddings_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1754516472754,
+      "tag": "20250806214112_update_stored_procedure_for_content_column",
+      "breakpoints": true
     }
   ]
 }

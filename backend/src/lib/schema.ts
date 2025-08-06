@@ -46,18 +46,16 @@ export const embeddings = pgTable(
       onDelete: 'cascade',
     }),
     contentType: text('content_type').notNull(),
-    title: text('title'),
-    description: text('description'),
-    originalText: text('original_text').notNull(),
+    content: text('content').notNull(), // Simplified: stores the full content with title/description embedded
     sourceUrl: text('source_url'),
     embedding: vector('embedding', { dimensions: 1536 }),
-    metadata: jsonb('metadata'),
+    metadata: jsonb('metadata'), // Can store extracted title/description if needed
   },
   (table) => [
     // GIN index for full-text search - directly on tsvector function
     index('embeddings_fts_idx').using(
       'gin',
-      sql`to_tsvector('english', ${table.originalText})`,
+      sql`to_tsvector('english', ${table.content})`,
     ),
     // Index for filtering by library
     index('idx_embeddings_library_id').on(table.libraryId),

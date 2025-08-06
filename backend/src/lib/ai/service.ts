@@ -32,7 +32,6 @@ const HeaderAnalysisSchema = z.object({
     }),
   ),
   confidence: z.number().min(0).max(1),
-  sampleSections: z.array(z.string()).max(3),
 });
 
 export async function analyzeMarkdownHeaders(markdown: string) {

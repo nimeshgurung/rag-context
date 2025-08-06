@@ -152,7 +152,7 @@ export async function handleApiSpecSource(
 
     const itemsToIngest = chunks.map((chunk) => ({
       id: chunk.id,
-      text: chunk.originalText,
+      text: chunk.content,
       metadata: {
         library_id: chunk.libraryId,
         content_type: chunk.contentType,

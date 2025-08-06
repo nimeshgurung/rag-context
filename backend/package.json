@@ -17,10 +17,6 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:clear": "tsx scripts/clear-db.ts",
-    "trigger-processing": "tsx scripts/trigger-processing.ts",
-    "migrate:job-ids": "tsx scripts/migrate-job-ids.ts",
-    "test:cascade": "tsx scripts/test-cascade-delete.ts",
-    "test:architecture": "tsx scripts/test-new-architecture.ts",
     "playwright:install": "playwright install --with-deps chromium",
     "postinstall": "playwright install --with-deps chromium"
   },

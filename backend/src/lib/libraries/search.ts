@@ -18,9 +18,7 @@ interface LibrarySearchRow {
 // Type for the documentation search query result from stored procedure
 interface DocumentationRow {
   vector_id: string;
-  original_text: string;
-  title: string | null;
-  description: string | null;
+  content: string;
   content_type: string;
   metadata: Record<string, unknown> | null;
   similarity_score?: number;
@@ -124,9 +122,7 @@ export async function fetchLibraryDocumentation(
     const drizzleRows = await db
       .select({
         vector_id: embeddings.vectorId,
-        original_text: embeddings.originalText,
-        title: embeddings.title,
-        description: embeddings.description,
+        content: embeddings.content,
         content_type: embeddings.contentType,
         metadata: embeddings.metadata,
       })
@@ -146,24 +142,7 @@ export async function fetchLibraryDocumentation(
 
   // 📄 Format results for display
   const formattedResults = rows.map((row) => {
-    switch (row.content_type) {
-      case 'code':
-        const language =
-          row.metadata &&
-          typeof row.metadata === 'object' &&
-          'language' in row.metadata
-            ? String(row.metadata.language)
-            : '';
-        return `
-### ${row.title || 'Code Example'} \n\n
-**Description:** ${row.description || 'N/A'} \n\n
-\`\`\`${language}
-${row.original_text}
-\`\`\` \n\n
-        `.trim();
-      default:
-        return String(row.original_text).trim();
-    }
+    return String(row.content).trim(); // 'original_text' is aliased from 'content' in the query
   });
 
   return formattedResults.join('\n\n--------------------------------\n\n');

@@ -1,5 +1,4 @@
 import { jobService, EmbeddingJobInput } from './jobService';
-import { EmbeddingJobPayload } from './jobService';
 
 export async function startCrawlJob(
   libraryName: string,
