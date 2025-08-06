@@ -324,7 +324,10 @@ class JobService {
       // Fetch fresh content from the URL (all web scraping is documentation-based)
       let fetchResult;
       try {
-        fetchResult = await fetchMarkdownForUrl(job.sourceUrl, job.preExecutionSteps);
+        fetchResult = await fetchMarkdownForUrl(
+          job.sourceUrl,
+          job.preExecutionSteps,
+        );
 
         if (!fetchResult.success) {
           isFetchError = true;
@@ -502,14 +505,16 @@ class JobService {
       throw new Error(`Job with ID ${jobItemId} not found.`);
     }
 
-    const job = rows[0];
+    const job = rows[0] as EmbeddingJobPayload & { id: number };
 
     try {
       // Update status to processing
       await this.markJobAsProcessing(job.id);
 
-      // Fetch fresh content from the URL (all web scraping is documentation-based)
-      const fetchResult = await fetchMarkdownForUrl(job.sourceUrl || '');
+      const fetchResult = await fetchMarkdownForUrl(
+        job.sourceUrl,
+        job.preExecutionSteps,
+      );
 
       if (!fetchResult.success) {
         throw new Error(`Failed to fetch content: ${fetchResult.error}`);

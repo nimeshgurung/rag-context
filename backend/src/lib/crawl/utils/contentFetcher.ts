@@ -66,23 +66,6 @@ export async function fetchMarkdownForUrl(
             // Wait for page to fully load
             await page.waitForLoadState('networkidle', { timeout: 10000 });
 
-            // Execute pre-execution steps if provided
-            if (preExecutionSteps && preExecutionSteps.trim()) {
-              try {
-                console.log(`Executing pre-execution steps for ${request.url}`);
-                await page.evaluate(preExecutionSteps);
-
-                // Wait a bit for any dynamic content changes
-                await page.waitForTimeout(1000);
-              } catch (error) {
-                console.warn(
-                  `Pre-execution steps failed for ${request.url}:`,
-                  error,
-                );
-                // Continue with scraping even if pre-execution steps fail
-              }
-            }
-
             // For hash-based URLs, wait for content to load
             const urlObj = new URL(request.url);
             if (urlObj.hash && urlObj.hash.length > 1) {
@@ -99,6 +82,23 @@ export async function fetchMarkdownForUrl(
                 );
               } catch {
                 // Content might be loaded differently, continue anyway
+              }
+            }
+
+            // Execute pre-execution steps if provided
+            if (preExecutionSteps && preExecutionSteps.trim()) {
+              try {
+                console.log(`Executing pre-execution steps for ${request.url}`);
+                await page.evaluate(preExecutionSteps);
+
+                // Wait a bit for any dynamic content changes
+                await page.waitForTimeout(1000);
+              } catch (error) {
+                console.warn(
+                  `Pre-execution steps failed for ${request.url}:`,
+                  error,
+                );
+                // Continue with scraping even if pre-execution steps fail
               }
             }
 
@@ -138,18 +138,6 @@ export async function fetchMarkdownForUrl(
       };
     }
   }) as Promise<FetchResult>;
-}
-
-/**
- * Fetches fresh code snippets for a single URL.
- * This is used during the processing phase for code-type scraping.
- */
-export async function fetchCodeSnippetsForUrl(
-  url: string,
-): Promise<FetchResult> {
-  // For now, we'll implement this similarly to markdown fetching
-  // In the future, this could be enhanced with code-specific extraction
-  return fetchMarkdownForUrl(url);
 }
 
 /**
