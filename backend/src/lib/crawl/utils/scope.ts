@@ -64,7 +64,7 @@ export function buildScopeGlobs(startUrl: string): string[] {
 
   return [
     pathParts.length > 0
-      ? `${urlObj.origin}/${pathParts[0]}/**`
+      ? `${urlObj.origin}/${pathParts.join('/')}/**`
       : `${urlObj.origin}/**`,
   ];
 }
