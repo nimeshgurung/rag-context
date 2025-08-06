@@ -41,8 +41,8 @@ export async function handleApiSpecSource(
         throw new Error(`Library with id "${libraryId}" does not exist.`);
       }
 
-      libraryName = existing[0].name || '';
-      libraryDescription = existing[0].description || '';
+      libraryName = existing[0].name;
+      libraryDescription = existing[0].description;
 
       // Send events to both job and library channels
       sendMultiEvent([jobId, libraryId], {
@@ -57,6 +57,11 @@ export async function handleApiSpecSource(
       libraryName = source.name;
       libraryDescription = source.description;
       libraryId = slug(libraryName);
+
+      // Validate that description is not empty
+      if (!libraryDescription || libraryDescription.trim() === '') {
+        throw new Error('Library description is required and cannot be empty.');
+      }
 
       const existing = await db
         .select({ id: libraries.id })

@@ -190,8 +190,6 @@ export async function getAllJobsForLibrary(libraryId: string): Promise<{
       sourceUrl: string;
       status: string;
       processedAt: string | null;
-      errorMessage: string | null;
-
     }>;
   }>;
 }> {

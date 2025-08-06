@@ -17,14 +17,14 @@ export const libraries = pgTable(
   {
     id: varchar('id', { length: 255 }).primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
-    description: text('description'),
+    description: text('description').notNull(),
     embedding: vector('embedding', { dimensions: 1536 }), // OpenAI text-embedding-3-small
   },
   (table) => [
     // GIN index for full-text search - directly on tsvector function
     index('libraries_fts_idx').using(
       'gin',
-      sql`to_tsvector('english', COALESCE(${table.name}, '') || ' ' || COALESCE(${table.description}, ''))`,
+      sql`to_tsvector('english', ${table.name} || ' ' || ${table.description})`,
     ),
     // HNSW index for vector similarity search
     index('idx_libraries_embedding').using(
@@ -80,15 +80,11 @@ export const embeddingJobs = pgTable(
     id: serial('id').primaryKey(),
     jobId: varchar('job_id').notNull(), // UUID for grouping related jobs
     libraryId: text('library_id').notNull(),
-    libraryName: text('library_name'),
-    libraryDescription: text('library_description'),
     sourceUrl: text('source_url').notNull(),
 
     additionalInstructions: text('additional_instructions'), // Additional AI instructions
     preExecutionSteps: text('pre_execution_steps'), // JavaScript code to execute before scraping
     status: varchar('status', { length: 20 }).default('pending'), // 'pending' | 'processing' | 'completed' | 'failed'
-    attempts: integer('attempts').default(0),
-    errorMessage: text('error_message'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
     processedAt: timestamp('processed_at', { withTimezone: true }),

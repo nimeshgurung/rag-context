@@ -1,0 +1,1 @@
+ALTER TABLE "libraries" ALTER COLUMN "description" SET NOT NULL;

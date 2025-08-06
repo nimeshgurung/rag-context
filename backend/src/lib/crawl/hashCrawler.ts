@@ -1,14 +1,14 @@
 import { PlaywrightCrawler, Configuration } from 'crawlee';
 import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
-import { EmbeddingJobPayload } from '../jobs/jobService';
+import { EmbeddingJobInput } from '../jobs/jobService';
 import { extractHashRoutes, isWithinScope, type CrawlOptions } from './utils';
 
 /**
  * Crawls a hash-based documentation site
  */
 export async function crawlHash(options: CrawlOptions) {
-  const { jobId, source, libraryId, libraryDescription } = options;
+  const { jobId, source, libraryId, libraryName, libraryDescription } = options;
   const { startUrl } = source;
 
   const processedUrls = new Set<string>();
@@ -67,11 +67,9 @@ export async function crawlHash(options: CrawlOptions) {
           }
 
           // Create job for this URL
-          const job: EmbeddingJobPayload = {
+          const job: EmbeddingJobInput = {
             jobId,
             libraryId,
-            libraryName: source.name,
-            libraryDescription,
             sourceUrl: currentUrl,
             additionalInstructions: source.config.additionalInstructions,
             preExecutionSteps: source.config.preExecutionSteps,

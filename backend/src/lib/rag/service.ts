@@ -79,6 +79,14 @@ class RagService {
     name: string;
     description: string;
   }) {
+    // Validate required fields
+    if (!library.name || library.name.trim() === '') {
+      throw new Error('Library name is required and cannot be empty.');
+    }
+    if (!library.description || library.description.trim() === '') {
+      throw new Error('Library description is required and cannot be empty.');
+    }
+
     const { embedding } = await embed({
       model: models['text-embedding-3-small'],
       value: `${library.name}: ${library.description}`,

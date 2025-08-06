@@ -1,4 +1,4 @@
-import { jobService } from './jobService';
+import { jobService, EmbeddingJobInput } from './jobService';
 import { EmbeddingJobPayload } from './jobService';
 
 export async function startCrawlJob(
@@ -39,6 +39,6 @@ export async function getAllJobsForLibrary(libraryId: string) {
   return await jobService.getAllJobsForLibrary(libraryId);
 }
 
-export async function enqueueEmbeddingJobs(jobs: EmbeddingJobPayload[]) {
+export async function enqueueEmbeddingJobs(jobs: EmbeddingJobInput[]) {
   return await jobService.enqueueEmbeddingJobs(jobs);
 }

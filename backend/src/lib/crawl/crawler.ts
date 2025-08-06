@@ -11,12 +11,14 @@ export async function crawlSource(
   jobId: string,
   source: WebScrapeSource,
   libraryId: string,
+  libraryName: string,
   libraryDescription: string,
 ) {
   const options: CrawlOptions = {
     jobId,
     source,
     libraryId,
+    libraryName,
     libraryDescription,
   };
 

@@ -16,7 +16,7 @@ export async function getUniqueLibraries(): Promise<LibrarySearchResult[]> {
   return result.map((row) => ({
     libraryId: row.id,
     name: row.name,
-    description: row.description || '',
+    description: row.description,
     similarityScore: 0,
     keywordScore: 0,
     hybridScore: 0,
@@ -30,7 +30,9 @@ export async function deleteLibrary(libraryId: string) {
       await tx.delete(embeddings).where(eq(embeddings.libraryId, libraryId));
 
       // Delete all embedding jobs associated with the library
-      await tx.delete(embeddingJobs).where(eq(embeddingJobs.libraryId, libraryId));
+      await tx
+        .delete(embeddingJobs)
+        .where(eq(embeddingJobs.libraryId, libraryId));
 
       // Delete the library itself
       await tx.delete(libraries).where(eq(libraries.id, libraryId));

@@ -50,6 +50,27 @@
       "when": 1754503375487,
       "tag": "20250806180255_rename_custom_enrichment_to_additional_instructions",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1754505586736,
+      "tag": "20250806183946_make_library_description_required",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1754505733997,
+      "tag": "20250806184213_make_embedding_jobs_library_fields_required",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1754506688990,
+      "tag": "20250806185808_remove_redundant_embedding_jobs_columns",
+      "breakpoints": true
     }
   ]
 }

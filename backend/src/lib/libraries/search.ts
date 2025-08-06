@@ -9,7 +9,7 @@ import { embeddings } from '../schema.js';
 interface LibrarySearchRow {
   library_id: string;
   name: string;
-  description: string | null;
+  description: string;
   similarity_score: number;
   keyword_score: number;
   hybrid_score: number;
@@ -73,7 +73,7 @@ export async function searchLibraries(
   return (result.rows as unknown as LibrarySearchRow[]).map((row) => ({
     libraryId: row.library_id,
     name: row.name,
-    description: row.description || '',
+    description: row.description,
     similarityScore: row.similarity_score,
     keywordScore: row.keyword_score,
     hybridScore: row.hybrid_score,

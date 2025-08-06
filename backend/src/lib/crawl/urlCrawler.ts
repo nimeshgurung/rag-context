@@ -1,14 +1,14 @@
 import { PlaywrightCrawler, Configuration } from 'crawlee';
 import { enqueueEmbeddingJobs } from '../jobs/service';
 import { sendEvent } from '../events';
-import { EmbeddingJobPayload } from '../jobs/jobService';
+import { EmbeddingJobInput } from '../jobs/jobService';
 import { buildScopeGlobs, type CrawlOptions } from './utils';
 
 /**
  * Crawls a traditional multi-page documentation site
  */
 export async function crawlUrl(options: CrawlOptions) {
-  const { jobId, source, libraryId, libraryDescription } = options;
+  const { jobId, source, libraryId, libraryName, libraryDescription } = options;
   const { startUrl } = source;
 
   const crawlerConfig = new Configuration({
@@ -32,11 +32,9 @@ export async function crawlUrl(options: CrawlOptions) {
         });
 
         // Create job for this URL
-        const job: EmbeddingJobPayload = {
+        const job: EmbeddingJobInput = {
           jobId,
           libraryId,
-          libraryName: source.name,
-          libraryDescription,
           sourceUrl: request.url,
           additionalInstructions: source.config.additionalInstructions,
           preExecutionSteps: source.config.preExecutionSteps,

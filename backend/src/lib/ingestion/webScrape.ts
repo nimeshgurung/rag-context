@@ -14,12 +14,14 @@ export async function handleWebScrapeSource(
 ) {
   try {
     let libraryId: string;
+    let libraryName: string;
+    let libraryDescription: string;
 
     if (existingLibraryId) {
       // Add to existing library
       libraryId = existingLibraryId;
 
-      // Verify library exists
+      // Verify library exists and get its actual name and description
       const existing = await db
         .select({
           id: libraries.id,
@@ -34,10 +36,14 @@ export async function handleWebScrapeSource(
         throw new Error(`Library with id "${libraryId}" does not exist.`);
       }
 
+      // Use the actual library name and description from database
+      libraryName = existing[0].name;
+      libraryDescription = existing[0].description;
+
       // Send events to both job and library channels
       sendMultiEvent([jobId, libraryId], {
         type: 'resource:adding',
-        message: `Adding resource to existing library: ${existing[0].name}`,
+        message: `Adding resource to existing library: ${libraryName}`,
         jobId,
         libraryId,
         resourceType: 'web-scrape',
@@ -51,6 +57,13 @@ export async function handleWebScrapeSource(
       });
 
       libraryId = slug(source.name);
+      libraryName = source.name;
+      libraryDescription = source.description;
+
+      // Validate that description is not empty
+      if (!libraryDescription || libraryDescription.trim() === '') {
+        throw new Error('Library description is required and cannot be empty.');
+      }
 
       const existing = await db
         .select({ id: libraries.id })
@@ -59,13 +72,13 @@ export async function handleWebScrapeSource(
         .limit(1);
 
       if (existing.length > 0) {
-        throw new Error(`Library with name "${source.name}" already exists.`);
+        throw new Error(`Library with name "${libraryName}" already exists.`);
       }
 
       await ragService.upsertLibrary({
         id: libraryId,
-        name: source.name,
-        description: source.description,
+        name: libraryName,
+        description: libraryDescription,
       });
 
       // Send events to both job and library channels
@@ -74,21 +87,27 @@ export async function handleWebScrapeSource(
         message: 'Library entry created. Starting web crawl...',
         jobId,
         libraryId,
-        name: source.name,
-        description: source.description,
+        name: libraryName,
+        description: libraryDescription,
       });
 
       // Also send to global library channel for library list updates
       sendEvent('global', {
         type: 'library:created',
         libraryId,
-        name: source.name,
-        description: source.description,
+        name: libraryName,
+        description: libraryDescription,
       });
     }
 
-    // Always crawl the source
-    await crawlSource(jobId, source, libraryId, source.description);
+    // Pass the correct library name and description (not the source's!)
+    await crawlSource(
+      jobId,
+      source,
+      libraryId,
+      libraryName,
+      libraryDescription,
+    );
 
     // Send completion events to both channels
     const finalMessage = existingLibraryId

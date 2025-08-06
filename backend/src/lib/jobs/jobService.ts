@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import slug from 'slug';
 import PQueue from 'p-queue';
 import { db } from '../db';
-import { embeddingJobs } from '../schema.js';
+import { embeddingJobs, libraries } from '../schema.js';
 import { eq, desc, sql, inArray } from 'drizzle-orm';
 import { WebScrapeSource } from '../types';
 import { crawlSource } from '../crawl/crawler';
@@ -11,27 +11,20 @@ import { ragService } from '../rag/service';
 import { sendEvent } from '../events';
 import { fetchMarkdownForUrl } from '../crawl/utils/contentFetcher';
 
-// Type for the raw embedding job row from database
-interface EmbeddingJobRow extends Record<string, unknown> {
-  id: number;
-  job_id: string;
-  library_id: string;
-  library_name: string | null;
-  library_description: string | null;
-  source_url: string;
-  additional_instructions: string | null;
-  pre_execution_steps: string | null;
-}
-
-export interface EmbeddingJobPayload {
-  id?: number; // The database row ID for the job
+// For creating new jobs (without library name/description)
+export interface EmbeddingJobInput {
   jobId?: string;
   libraryId: string;
-  libraryName: string;
-  libraryDescription: string;
   sourceUrl: string;
   additionalInstructions?: string;
   preExecutionSteps?: string;
+}
+
+// For processing jobs (with library name/description from JOIN)
+export interface EmbeddingJobPayload extends EmbeddingJobInput {
+  id?: number; // The database row ID for the job
+  libraryName: string; // Fetched from libraries table via JOIN
+  libraryDescription: string; // Fetched from libraries table via JOIN
 }
 
 export interface JobBatch {
@@ -42,7 +35,6 @@ export interface JobBatch {
     sourceUrl: string;
     status: string;
     processedAt: Date | null;
-    errorMessage: string | null;
   }[];
   summary?: {
     total: number;
@@ -158,7 +150,7 @@ class JobService {
   /**
    * Enqueue multiple embedding jobs into the database.
    */
-  async enqueueEmbeddingJobs(jobs: EmbeddingJobPayload[]): Promise<void> {
+  async enqueueEmbeddingJobs(jobs: EmbeddingJobInput[]): Promise<void> {
     if (jobs.length === 0) {
       return;
     }
@@ -169,8 +161,6 @@ class JobService {
         const jobData = jobs.map((job) => ({
           jobId: job.jobId || '',
           libraryId: job.libraryId,
-          libraryName: job.libraryName,
-          libraryDescription: job.libraryDescription,
           sourceUrl: job.sourceUrl,
 
           additionalInstructions: job.additionalInstructions || null,
@@ -205,40 +195,78 @@ class JobService {
   ): Promise<(EmbeddingJobPayload & { id: number })[]> {
     try {
       return await db.transaction(async (tx) => {
-        // Complex query with row locking requires raw SQL
+        // Complex query with row locking requires raw SQL with JOIN to get library info
         let query = sql`
-          SELECT *
-          FROM embedding_jobs
-          WHERE status = 'pending'
+          SELECT
+            ej.id,
+            ej.job_id,
+            ej.library_id,
+            ej.source_url,
+            ej.additional_instructions,
+            ej.pre_execution_steps,
+            l.name as library_name,
+            l.description as library_description
+          FROM embedding_jobs ej
+          INNER JOIN libraries l ON ej.library_id = l.id
+          WHERE ej.status = 'pending'
         `;
 
         if (jobId) {
           query = sql`
-            SELECT *
-            FROM embedding_jobs
-            WHERE status = 'pending' AND job_id = ${jobId}
-            ORDER BY created_at ASC
+            SELECT
+              ej.id,
+              ej.job_id,
+              ej.library_id,
+              ej.source_url,
+              ej.additional_instructions,
+              ej.pre_execution_steps,
+              l.name as library_name,
+              l.description as library_description
+            FROM embedding_jobs ej
+            INNER JOIN libraries l ON ej.library_id = l.id
+            WHERE ej.status = 'pending' AND ej.job_id = ${jobId}
+            ORDER BY ej.created_at ASC
             LIMIT ${limit}
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE OF ej SKIP LOCKED
           `;
         } else {
           query = sql`
-            SELECT *
-            FROM embedding_jobs
-            WHERE status = 'pending'
-            ORDER BY created_at ASC
+            SELECT
+              ej.id,
+              ej.job_id,
+              ej.library_id,
+              ej.source_url,
+              ej.additional_instructions,
+              ej.pre_execution_steps,
+              l.name as library_name,
+              l.description as library_description
+            FROM embedding_jobs ej
+            INNER JOIN libraries l ON ej.library_id = l.id
+            WHERE ej.status = 'pending'
+            ORDER BY ej.created_at ASC
             LIMIT ${limit}
-            FOR UPDATE SKIP LOCKED
+            FOR UPDATE OF ej SKIP LOCKED
           `;
         }
 
         const result = await tx.execute(query);
-        const jobs = (result.rows as EmbeddingJobRow[]).map((row) => ({
+        const jobs = (
+          result.rows as Array<{
+            id: number;
+            job_id: string;
+            library_id: string;
+            source_url: string;
+            additional_instructions: string | null;
+            pre_execution_steps: string | null;
+            library_name: string;
+            library_description: string;
+          }>
+        ).map((row) => ({
           id: row.id,
           jobId: row.job_id,
           libraryId: row.library_id,
-          libraryName: row.library_name || '',
-          libraryDescription: row.library_description || '',
+          libraryName: row.library_name,
+          libraryDescription: row.library_description,
           sourceUrl: row.source_url,
           additionalInstructions: row.additional_instructions || undefined,
         }));
@@ -273,21 +301,14 @@ class JobService {
   }
 
   /**
-   * Mark a job as failed with error details and type.
+   * Mark a job as failed.
    * @param jobId - The job ID to mark as failed
-   * @param errorMessage - The error message
-   * @param errorType - Type of error: 'fetch' or 'processing'
    */
-  private async markJobAsFailed(
-    jobId: number,
-    errorMessage: string,
-    errorType: 'fetch' | 'processing' = 'processing',
-  ) {
+  private async markJobAsFailed(jobId: number) {
     await db
       .update(embeddingJobs)
       .set({
         status: 'failed',
-        errorMessage: `[${errorType}] ${errorMessage}`,
         updatedAt: new Date(),
       })
       .where(eq(embeddingJobs.id, jobId));
@@ -374,7 +395,7 @@ class JobService {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       const errorType = isFetchError ? 'fetch' : 'processing';
-      await this.markJobAsFailed(job.id, message, errorType);
+      await this.markJobAsFailed(job.id);
 
       // Send error event with error type
       if (job.jobId) {
@@ -419,7 +440,7 @@ class JobService {
       };
 
       // Don't await, let it run in the background
-      crawlSource(jobId, source, libraryId, libraryDescription);
+      crawlSource(jobId, source, libraryId, libraryName, libraryDescription);
 
       return jobId;
     } catch (error) {
@@ -496,8 +517,18 @@ class JobService {
    */
   async processSingleJob(jobItemId: number) {
     const rows = await db
-      .select()
+      .select({
+        id: embeddingJobs.id,
+        jobId: embeddingJobs.jobId,
+        libraryId: embeddingJobs.libraryId,
+        sourceUrl: embeddingJobs.sourceUrl,
+        additionalInstructions: embeddingJobs.additionalInstructions,
+        preExecutionSteps: embeddingJobs.preExecutionSteps,
+        libraryName: libraries.name,
+        libraryDescription: libraries.description,
+      })
       .from(embeddingJobs)
+      .innerJoin(libraries, eq(embeddingJobs.libraryId, libraries.id))
       .where(eq(embeddingJobs.id, jobItemId))
       .limit(1);
 
@@ -505,7 +536,16 @@ class JobService {
       throw new Error(`Job with ID ${jobItemId} not found.`);
     }
 
-    const job = rows[0] as EmbeddingJobPayload & { id: number };
+    const job: EmbeddingJobPayload & { id: number } = {
+      id: rows[0].id,
+      jobId: rows[0].jobId || undefined,
+      libraryId: rows[0].libraryId,
+      libraryName: rows[0].libraryName,
+      libraryDescription: rows[0].libraryDescription,
+      sourceUrl: rows[0].sourceUrl,
+      additionalInstructions: rows[0].additionalInstructions || undefined,
+      preExecutionSteps: rows[0].preExecutionSteps || undefined,
+    };
 
     try {
       // Update status to processing
@@ -556,8 +596,7 @@ class JobService {
         message: `Job ${job.id} processed successfully with fresh content.`,
       };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      await this.markJobAsFailed(job.id, message, 'processing');
+      await this.markJobAsFailed(job.id);
       throw error;
     }
   }
@@ -646,7 +685,6 @@ class JobService {
         status: embeddingJobs.status,
         createdAt: embeddingJobs.createdAt,
         processedAt: embeddingJobs.processedAt,
-        errorMessage: embeddingJobs.errorMessage,
       })
       .from(embeddingJobs)
       .where(eq(embeddingJobs.libraryId, libraryId))
@@ -669,7 +707,6 @@ class JobService {
         sourceUrl: row.sourceUrl || '',
         status: row.status || 'pending',
         processedAt: row.processedAt,
-        errorMessage: row.errorMessage,
       });
     }
 
@@ -761,7 +798,7 @@ class JobService {
               console.error(`Error processing job ${job.id}:`, error);
               const message =
                 error instanceof Error ? error.message : String(error);
-              await this.markJobAsFailed(job.id, message, 'processing');
+              await this.markJobAsFailed(job.id);
 
               // Send error event for this specific job
               if (job.jobId) {

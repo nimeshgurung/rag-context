@@ -3,7 +3,6 @@ export interface JobItem {
   sourceUrl: string;
   status: string;
   processedAt: string | null;
-  errorMessage: string | null;
 }
 
 export interface JobSummary {
