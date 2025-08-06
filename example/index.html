@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation - Hash Routing Example</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            background: #2d3748;
+            color: white;
+            padding: 2rem 1rem;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h1 {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: #68d391;
+        }
+
+        .nav-menu {
+            list-style: none;
+        }
+
+        .nav-menu li {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-menu a {
+            color: #a0aec0;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            display: block;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .nav-menu a:hover,
+        .nav-menu a.active {
+            background: #4a5568;
+            color: white;
+        }
+
+        .content {
+            padding: 2rem;
+            background: white;
+            margin: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        h2 {
+            color: #2d3748;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #68d391;
+        }
+
+        h3 {
+            color: #4a5568;
+            margin: 1.5rem 0 1rem 0;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #68d391;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            margin: 1rem 0;
+            overflow-x: auto;
+        }
+
+        .endpoint {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+
+        .method {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .method.get { background: #48bb78; color: white; }
+        .method.post { background: #4299e1; color: white; }
+        .method.put { background: #ed8936; color: white; }
+        .method.delete { background: #f56565; color: white; }
+
+        .current-route {
+            background: #edf2f7;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-family: monospace;
+            color: #4a5568;
+        }
+
+        .breadcrumb {
+            color: #a0aec0;
+            margin-bottom: 1rem;
+        }
+
+        .param-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        .param-table th,
+        .param-table td {
+            border: 1px solid #e2e8f0;
+            padding: 0.5rem;
+            text-align: left;
+        }
+
+        .param-table th {
+            background: #f7fafc;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="sidebar">
+            <h1>API Docs</h1>
+            <ul class="nav-menu">
+                <li><a href="#/" data-route="home">🏠 Getting Started</a></li>
+                <li><a href="#/authentication" data-route="authentication">🔐 Authentication</a></li>
+                <li><a href="#/users" data-route="users">👥 Users API</a></li>
+                <li><a href="#/users/create" data-route="users-create">➕ Create User</a></li>
+                <li><a href="#/posts" data-route="posts">📝 Posts API</a></li>
+                <li><a href="#/posts/comments" data-route="posts-comments">💬 Comments</a></li>
+                <li><a href="#/webhooks" data-route="webhooks">🔗 Webhooks</a></li>
+                <li><a href="#/errors" data-route="errors">❌ Error Codes</a></li>
+                <li><a href="#/sdk" data-route="sdk">📦 SDK Reference</a></li>
+                <li><a href="#/changelog" data-route="changelog">📋 Changelog</a></li>
+                <li style="margin-top: 1rem; border-top: 1px solid #4a5568; padding-top: 1rem;">
+                    <a href="https://github.com/example/api-docs" target="_blank" rel="noopener">📚 GitHub Docs</a>
+                </li>
+                <li><a href="https://example.com/blog" target="_blank" rel="noopener">📝 Blog</a></li>
+                <li><a href="mailto:support@example.com">📧 Support</a></li>
+                <li><a href="https://status.example.com" target="_blank" rel="noopener">🔍 Status Page</a></li>
+            </ul>
+        </nav>
+
+        <main class="content">
+            <div class="current-route" id="current-route">Current Route: #/</div>
+
+            <!-- Home Page -->
+            <div id="home" class="page active">
+                <div class="breadcrumb">Documentation > Getting Started</div>
+                <h2>Welcome to the API Documentation</h2>
+                <p>This is a sample documentation site demonstrating hash-based routing. Navigate through the different sections using the sidebar menu.</p>
+
+                <h3>Quick Start</h3>
+                <p>Get started with our API in just a few steps:</p>
+                <ol>
+                    <li>Obtain your API key from the authentication section</li>
+                    <li>Make your first request to the Users API</li>
+                    <li>Explore other endpoints</li>
+                    <li>Check out our <a href="https://github.com/example/api-examples" target="_blank" rel="noopener">GitHub examples repository</a></li>
+                    <li>Join our <a href="https://discord.gg/example" target="_blank" rel="noopener">Discord community</a></li>
+                </ol>
+
+                <div class="code-block">
+curl -X GET "https://api.example.com/v1/users" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+                </div>
+
+                <h3>Current Hash Route Examples</h3>
+                <p>This site uses the following hash routing patterns:</p>
+                <ul>
+                    <li><code>#/</code> - Home page</li>
+                    <li><code>#/authentication</code> - Authentication docs</li>
+                    <li><code>#/users</code> - Users API reference</li>
+                    <li><code>#/posts/comments</code> - Nested route example</li>
+                </ul>
+            </div>
+
+            <!-- Authentication Page -->
+            <div id="authentication" class="page">
+                <div class="breadcrumb">Documentation > Authentication</div>
+                <h2>Authentication</h2>
+                <p>All API requests require authentication using Bearer tokens.</p>
+
+                <h3>Obtaining an API Key</h3>
+                <p>To get your API key, <a href="https://dashboard.example.com/register" target="_blank" rel="noopener">register an account</a> and navigate to your dashboard. For help, contact <a href="mailto:auth-support@example.com">auth support</a>.</p>
+
+                <div class="code-block">
+POST /v1/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "your-password"
+}
+                </div>
+
+                <h3>Using the API Key</h3>
+                <p>Include your API key in the Authorization header:</p>
+                <div class="code-block">
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+                </div>
+            </div>
+
+            <!-- Users API Page -->
+            <div id="users" class="page">
+                <div class="breadcrumb">Documentation > Users API</div>
+                <h2>Users API</h2>
+                <p>Manage user accounts and profiles through these endpoints.</p>
+
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /v1/users</h3>
+                    <p>Retrieve a list of all users.</p>
+
+                    <table class="param-table">
+                        <thead>
+                            <tr>
+                                <th>Parameter</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>limit</td>
+                                <td>integer</td>
+                                <td>Number of users to return (max 100)</td>
+                            </tr>
+                            <tr>
+                                <td>offset</td>
+                                <td>integer</td>
+                                <td>Number of users to skip</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /v1/users/{id}</h3>
+                    <p>Retrieve a specific user by ID.</p>
+                </div>
+
+                <div class="endpoint">
+                    <h3><span class="method put">PUT</span> /v1/users/{id}</h3>
+                    <p>Update a user's information.</p>
+                </div>
+
+                <div class="endpoint">
+                    <h3><span class="method delete">DELETE</span> /v1/users/{id}</h3>
+                    <p>Delete a user account.</p>
+                </div>
+            </div>
+
+            <!-- Create User Page -->
+            <div id="users-create" class="page">
+                <div class="breadcrumb">Documentation > Users API > Create User</div>
+                <h2>Create User</h2>
+                <p>Create a new user account.</p>
+
+                <div class="endpoint">
+                    <h3><span class="method post">POST</span> /v1/users</h3>
+                    <p>Creates a new user with the provided information.</p>
+
+                    <h4>Request Body</h4>
+                    <div class="code-block">
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "securepassword123",
+  "role": "user"
+}
+                    </div>
+
+                    <h4>Response</h4>
+                    <div class="code-block">
+{
+  "id": 123,
+  "name": "John Doe",
+  "email": "john@example.com",
+  "role": "user",
+  "created_at": "2024-01-01T00:00:00Z"
+}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Posts API Page -->
+            <div id="posts" class="page">
+                <div class="breadcrumb">Documentation > Posts API</div>
+                <h2>Posts API</h2>
+                <p>Manage blog posts and articles.</p>
+
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /v1/posts</h3>
+                    <p>Retrieve all posts.</p>
+                </div>
+
+                <div class="endpoint">
+                    <h3><span class="method post">POST</span> /v1/posts</h3>
+                    <p>Create a new post.</p>
+                </div>
+
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /v1/posts/{id}</h3>
+                    <p>Get a specific post by ID.</p>
+                </div>
+            </div>
+
+            <!-- Comments Page -->
+            <div id="posts-comments" class="page">
+                <div class="breadcrumb">Documentation > Posts API > Comments</div>
+                <h2>Post Comments</h2>
+                <p>Manage comments on blog posts.</p>
+
+                <div class="endpoint">
+                    <h3><span class="method get">GET</span> /v1/posts/{id}/comments</h3>
+                    <p>Get all comments for a specific post.</p>
+                </div>
+
+                <div class="endpoint">
+                    <h3><span class="method post">POST</span> /v1/posts/{id}/comments</h3>
+                    <p>Add a comment to a post.</p>
+
+                    <div class="code-block">
+{
+  "content": "Great article!",
+  "author_name": "Jane Doe"
+}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Webhooks Page -->
+            <div id="webhooks" class="page">
+                <div class="breadcrumb">Documentation > Webhooks</div>
+                <h2>Webhooks</h2>
+                <p>Set up webhooks to receive real-time notifications.</p>
+
+                <h3>Webhook Events</h3>
+                <ul>
+                    <li><code>user.created</code> - New user registration</li>
+                    <li><code>post.published</code> - New post published</li>
+                    <li><code>comment.added</code> - New comment added</li>
+                </ul>
+
+                <div class="code-block">
+POST /v1/webhooks
+{
+  "url": "https://yourdomain.com/webhook",
+  "events": ["user.created", "post.published"]
+}
+                </div>
+
+                <h3>Testing Webhooks</h3>
+                <p>For testing webhooks during development:</p>
+                <ul>
+                    <li>Use <a href="https://ngrok.com" target="_blank" rel="noopener">ngrok</a> to expose local servers</li>
+                    <li>Try <a href="https://webhook.site" target="_blank" rel="noopener">webhook.site</a> for quick testing</li>
+                    <li>Check our <a href="https://docs.example.com/webhooks/testing" target="_blank" rel="noopener">testing guide</a></li>
+                    <li>Need help? Email <a href="mailto:webhooks@example.com">webhooks@example.com</a></li>
+                </ul>
+            </div>
+
+            <!-- Error Codes Page -->
+            <div id="errors" class="page">
+                <div class="breadcrumb">Documentation > Error Codes</div>
+                <h2>Error Codes</h2>
+                <p>Common error codes and their meanings.</p>
+
+                <table class="param-table">
+                    <thead>
+                        <tr>
+                            <th>Code</th>
+                            <th>Status</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>400</td>
+                            <td>Bad Request</td>
+                            <td>Invalid request parameters</td>
+                        </tr>
+                        <tr>
+                            <td>401</td>
+                            <td>Unauthorized</td>
+                            <td>Missing or invalid API key</td>
+                        </tr>
+                        <tr>
+                            <td>404</td>
+                            <td>Not Found</td>
+                            <td>Resource not found</td>
+                        </tr>
+                        <tr>
+                            <td>429</td>
+                            <td>Too Many Requests</td>
+                            <td>Rate limit exceeded</td>
+                        </tr>
+                        <tr>
+                            <td>500</td>
+                            <td>Internal Server Error</td>
+                            <td>Server error occurred</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- SDK Page -->
+            <div id="sdk" class="page">
+                <div class="breadcrumb">Documentation > SDK Reference</div>
+                <h2>SDK Reference</h2>
+                <p>Official SDKs and libraries for popular programming languages.</p>
+
+                <h3>JavaScript SDK</h3>
+                <p>View the full source on <a href="https://github.com/example/js-sdk" target="_blank" rel="noopener">GitHub</a> or check the <a href="https://www.npmjs.com/package/@example/api-client" target="_blank" rel="noopener">NPM package</a>.</p>
+                <div class="code-block">
+npm install @example/api-client
+
+import ApiClient from '@example/api-client';
+
+const client = new ApiClient({
+  apiKey: 'your-api-key'
+});
+
+const users = await client.users.list();
+                </div>
+
+                <h3>Python SDK</h3>
+                <div class="code-block">
+pip install example-api-client
+
+from example_api import Client
+
+client = Client(api_key='your-api-key')
+users = client.users.list()
+                </div>
+
+                <h3>Ruby Gem</h3>
+                <div class="code-block">
+gem install example-api
+
+require 'example-api'
+
+client = ExampleAPI::Client.new(api_key: 'your-api-key')
+users = client.users.list
+                </div>
+            </div>
+
+            <!-- Changelog Page -->
+            <div id="changelog" class="page">
+                <div class="breadcrumb">Documentation > Changelog</div>
+                <h2>Changelog</h2>
+                <p>Recent updates and changes to the API.</p>
+
+                <h3>Version 2.1.0 - 2024-01-15</h3>
+                <ul>
+                    <li>Added webhook support</li>
+                    <li>Improved error handling</li>
+                    <li>Added pagination to users endpoint</li>
+                </ul>
+
+                <h3>Version 2.0.0 - 2023-12-01</h3>
+                <ul>
+                    <li>Major API redesign</li>
+                    <li>Breaking changes to authentication</li>
+                    <li>New posts and comments endpoints</li>
+                </ul>
+
+                <h3>Version 1.5.2 - 2023-11-15</h3>
+                <ul>
+                    <li>Bug fixes and performance improvements</li>
+                    <li>Updated rate limiting</li>
+                </ul>
+
+                <h3>Need Help?</h3>
+                <p>If you have questions about any changes:</p>
+                <ul>
+                    <li>📧 Email us at <a href="mailto:api-help@example.com">api-help@example.com</a></li>
+                    <li>💬 Join our <a href="https://slack.example.com/api-support" target="_blank" rel="noopener">Slack workspace</a></li>
+                    <li>🐛 Report issues on <a href="https://github.com/example/api-issues/issues" target="_blank" rel="noopener">GitHub Issues</a></li>
+                    <li>📖 Read our <a href="https://blog.example.com/category/api-updates" target="_blank" rel="noopener">migration guides</a></li>
+                </ul>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Hash-based routing implementation
+        class HashRouter {
+            constructor() {
+                this.routes = new Map();
+                this.currentRoute = '';
+
+                // Listen for hash changes
+                window.addEventListener('hashchange', () => this.handleRoute());
+
+                // Handle initial load
+                this.handleRoute();
+            }
+
+            // Register a route
+            addRoute(hash, elementId) {
+                this.routes.set(hash, elementId);
+            }
+
+            // Handle route changes
+            handleRoute() {
+                // Get current hash, default to '/' if empty
+                const hash = window.location.hash.slice(1) || '/';
+                this.currentRoute = hash;
+
+                // Update current route display
+                document.getElementById('current-route').textContent = `Current Route: #${hash}`;
+
+                // Hide all pages
+                document.querySelectorAll('.page').forEach(page => {
+                    page.classList.remove('active');
+                });
+
+                // Remove active state from nav links
+                document.querySelectorAll('.nav-menu a').forEach(link => {
+                    link.classList.remove('active');
+                });
+
+                // Find and show the matching page
+                let targetElementId = this.routes.get(hash);
+
+                // If no exact match, try to find a partial match for nested routes
+                if (!targetElementId) {
+                    for (let [route, elementId] of this.routes) {
+                        if (hash.startsWith(route) && route !== '/') {
+                            targetElementId = elementId;
+                            break;
+                        }
+                    }
+                }
+
+                // Default to home if no route found
+                if (!targetElementId) {
+                    targetElementId = 'home';
+                }
+
+                // Show the target page
+                const targetElement = document.getElementById(targetElementId);
+                if (targetElement) {
+                    targetElement.classList.add('active');
+                }
+
+                // Update active nav link
+                const activeLink = document.querySelector(`[href="#${hash}"]`) ||
+                                 document.querySelector(`[href="#/"]`);
+                if (activeLink) {
+                    activeLink.classList.add('active');
+                }
+
+                // Update page title
+                const pageTitle = targetElement?.querySelector('h2')?.textContent || 'API Documentation';
+                document.title = `${pageTitle} - Hash Routing Example`;
+            }
+
+            // Navigate to a route programmatically
+            navigate(hash) {
+                window.location.hash = hash;
+            }
+        }
+
+        // Initialize router and add routes
+        const router = new HashRouter();
+
+        // Define all routes
+        router.addRoute('/', 'home');
+        router.addRoute('/authentication', 'authentication');
+        router.addRoute('/users', 'users');
+        router.addRoute('/users/create', 'users-create');
+        router.addRoute('/posts', 'posts');
+        router.addRoute('/posts/comments', 'posts-comments');
+        router.addRoute('/webhooks', 'webhooks');
+        router.addRoute('/errors', 'errors');
+        router.addRoute('/sdk', 'sdk');
+        router.addRoute('/changelog', 'changelog');
+
+        // Add click handlers to navigation links
+        document.querySelectorAll('.nav-menu a').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const href = link.getAttribute('href');
+                router.navigate(href.slice(1)); // Remove the # for navigate method
+            });
+        });
+
+        // Demo of programmatic navigation (optional)
+        console.log('Hash Router initialized! Try navigating with:');
+        console.log('router.navigate("/users")');
+        console.log('router.navigate("/posts/comments")');
+
+        // Make router available globally for testing
+        window.router = router;
+    </script>
+</body>
+</html>

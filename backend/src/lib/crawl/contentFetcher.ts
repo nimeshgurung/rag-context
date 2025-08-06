@@ -59,7 +59,26 @@ export async function fetchMarkdownForUrl(url: string): Promise<FetchResult> {
           maxConcurrency: 1,
           requestHandlerTimeoutSecs: 30,
           navigationTimeoutSecs: 30,
-          async requestHandler({ page }) {
+          async requestHandler({ page, request }) {
+            // For hash-based URLs, wait for content to load
+            const urlObj = new URL(request.url);
+            if (urlObj.hash && urlObj.hash.length > 1) {
+              // Wait for SPA to load content
+              await page.waitForTimeout(2000);
+
+              // Try to wait for common content selectors
+              try {
+                await page.waitForSelector(
+                  'main, article, .content, .docs-content, .documentation',
+                  {
+                    timeout: 5000,
+                  },
+                );
+              } catch {
+                // Content might be loaded differently, continue anyway
+              }
+            }
+
             const html = await page.content();
             const dom = new JSDOM(html, { url });
             const reader = new Readability(dom.window.document);

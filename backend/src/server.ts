@@ -6,6 +6,7 @@ import librariesRoutes from './routes/libraries.js';
 import documentationRoutes from './routes/documentation.js';
 import jobsRoutes from './routes/jobs.js';
 import eventsRoutes from './routes/events.js';
+import { jobService } from './lib/jobs/jobService.js';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -31,6 +32,33 @@ app.post('/api/search', (req: Request, res: Response) => {
   librariesRoutes(req, res, () => {});
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Express server listening on http://localhost:${port}`);
 });
+
+// Graceful shutdown handling
+const gracefulShutdown = (signal: string) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+  // Shutdown job service first
+  jobService.shutdown();
+
+  server.close((err) => {
+    if (err) {
+      console.error('Error during server shutdown:', err);
+      process.exit(1);
+    }
+
+    console.log('Server closed successfully.');
+    process.exit(0);
+  });
+
+  // Force exit after 5 seconds if graceful shutdown fails
+  setTimeout(() => {
+    console.error('Graceful shutdown timeout. Forcing exit...');
+    process.exit(1);
+  }, 5000);
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

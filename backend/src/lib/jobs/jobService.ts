@@ -134,6 +134,7 @@ class JobService {
   private readonly RATE_LIMIT_PER_MINUTE: number;
   private readonly BATCH_SIZE: number;
   private readonly CONCURRENCY: number;
+  private shouldShutdown = false;
 
   constructor() {
     this.RATE_LIMIT_PER_MINUTE = process.env.EMBEDDING_RATE_LIMIT
@@ -147,6 +148,19 @@ class JobService {
       interval: 60 * 1000, // 1 minute
       intervalCap: this.RATE_LIMIT_PER_MINUTE,
     });
+  }
+
+  shutdown() {
+    console.log('Shutting down JobService...');
+    this.shouldShutdown = true;
+    this.queue.clear();
+  }
+
+  private async interruptibleSleep(ms: number): Promise<void> {
+    const start = Date.now();
+    while (Date.now() - start < ms && !this.shouldShutdown) {
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Check every 100ms
+    }
   }
 
   /**
@@ -738,7 +752,7 @@ class JobService {
       `Rate limit: ${this.RATE_LIMIT_PER_MINUTE}/minute, Concurrency: ${this.CONCURRENCY}`,
     );
 
-    while (true) {
+    while (!this.shouldShutdown) {
       try {
         const jobs = await this.fetchPendingJobs(this.BATCH_SIZE, jobId);
 
@@ -753,7 +767,8 @@ class JobService {
             });
             break;
           }
-          await new Promise((resolve) => setTimeout(resolve, 5000));
+          // Use interruptible sleep
+          await this.interruptibleSleep(5000);
           continue;
         }
 
@@ -806,8 +821,12 @@ class JobService {
             message: `Worker error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           });
         }
-        await new Promise((resolve) => setTimeout(resolve, 5000));
+        await this.interruptibleSleep(5000);
       }
+    }
+
+    if (this.shouldShutdown) {
+      console.log('Job processing stopped due to shutdown signal.');
     }
   }
 }

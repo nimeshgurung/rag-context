@@ -1,6 +1,5 @@
 import { WebScrapeSource } from '../types';
-import { crawlDocumentation } from './documentationCrawler';
-import { crawlCode } from './codeCrawler';
+import { crawlWithHashSupport } from './hashAwareCrawler';
 
 export async function crawlSource(
   jobId: string,
@@ -10,9 +9,11 @@ export async function crawlSource(
 ) {
   const { scrapeType } = source.config;
 
-  if (scrapeType === 'documentation') {
-    await crawlDocumentation(jobId, source, libraryId, libraryDescription);
-  } else {
-    await crawlCode(jobId, source, libraryId, libraryDescription);
-  }
+  await crawlWithHashSupport(
+    jobId,
+    source,
+    libraryId,
+    libraryDescription,
+    scrapeType,
+  );
 }

@@ -18,7 +18,8 @@
     "install:all": "npm install && cd backend && npm install && cd ../mcp && npm install && cd ../frontend && npm install",
     "playwright:setup": "cd backend && npm run playwright:install",
     "lint": "cd backend && npm run lint && cd ../mcp && npm run lint && cd ../frontend && npm run lint",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "example:serve": "node example/server.js"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
