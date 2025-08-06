@@ -41,7 +41,10 @@ export interface FetchResult {
  * Fetches fresh markdown content for a single URL.
  * This is used during the processing phase to get up-to-date content.
  */
-export async function fetchMarkdownForUrl(url: string): Promise<FetchResult> {
+export async function fetchMarkdownForUrl(
+  url: string,
+  preExecutionSteps?: string,
+): Promise<FetchResult> {
   const queue = getQueueForDomain(url);
 
   return queue.add<FetchResult>(async () => {
@@ -60,6 +63,26 @@ export async function fetchMarkdownForUrl(url: string): Promise<FetchResult> {
           requestHandlerTimeoutSecs: 30,
           navigationTimeoutSecs: 30,
           async requestHandler({ page, request }) {
+            // Wait for page to fully load
+            await page.waitForLoadState('networkidle', { timeout: 10000 });
+
+            // Execute pre-execution steps if provided
+            if (preExecutionSteps && preExecutionSteps.trim()) {
+              try {
+                console.log(`Executing pre-execution steps for ${request.url}`);
+                await page.evaluate(preExecutionSteps);
+
+                // Wait a bit for any dynamic content changes
+                await page.waitForTimeout(1000);
+              } catch (error) {
+                console.warn(
+                  `Pre-execution steps failed for ${request.url}:`,
+                  error,
+                );
+                // Continue with scraping even if pre-execution steps fail
+              }
+            }
+
             // For hash-based URLs, wait for content to load
             const urlObj = new URL(request.url);
             if (urlObj.hash && urlObj.hash.length > 1) {

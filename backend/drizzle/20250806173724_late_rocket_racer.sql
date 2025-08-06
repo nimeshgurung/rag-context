@@ -1,0 +1,1 @@
+ALTER TABLE "embedding_jobs" ADD COLUMN "pre_execution_steps" text;

@@ -20,6 +20,7 @@ interface EmbeddingJobRow extends Record<string, unknown> {
   library_description: string | null;
   source_url: string;
   custom_enrichment_prompt: string | null;
+  pre_execution_steps: string | null;
 }
 
 export interface EmbeddingJobPayload {
@@ -30,6 +31,7 @@ export interface EmbeddingJobPayload {
   libraryDescription: string;
   sourceUrl: string;
   customEnrichmentPrompt?: string;
+  preExecutionSteps?: string;
 }
 
 export interface JobBatch {
@@ -172,6 +174,7 @@ class JobService {
           sourceUrl: job.sourceUrl,
 
           customEnrichmentPrompt: job.customEnrichmentPrompt || null,
+          preExecutionSteps: job.preExecutionSteps || null,
         }));
 
         // Bulk insert using Drizzle
@@ -321,7 +324,7 @@ class JobService {
       // Fetch fresh content from the URL (all web scraping is documentation-based)
       let fetchResult;
       try {
-        fetchResult = await fetchMarkdownForUrl(job.sourceUrl);
+        fetchResult = await fetchMarkdownForUrl(job.sourceUrl, job.preExecutionSteps);
 
         if (!fetchResult.success) {
           isFetchError = true;
@@ -533,6 +536,7 @@ class JobService {
         libraryDescription: job.libraryDescription || '',
         sourceUrl: job.sourceUrl || '',
         customEnrichmentPrompt: job.customEnrichmentPrompt || undefined,
+        preExecutionSteps: job.preExecutionSteps || undefined,
       };
 
       console.log(

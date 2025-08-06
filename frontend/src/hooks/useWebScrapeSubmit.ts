@@ -27,6 +27,7 @@ export const useWebScrapeSubmit = (
       libraryName,
       description,
       startUrl,
+      preExecutionSteps,
       customEnrichmentPrompt,
     } = formData;
 
@@ -36,6 +37,7 @@ export const useWebScrapeSubmit = (
       description,
       startUrl,
       config: {
+        preExecutionSteps,
         customEnrichmentPrompt,
       },
     };

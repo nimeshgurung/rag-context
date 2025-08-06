@@ -39,6 +39,7 @@ export async function crawlUrl(options: CrawlOptions) {
           libraryDescription,
           sourceUrl: request.url,
           customEnrichmentPrompt: source.config.customEnrichmentPrompt,
+          preExecutionSteps: source.config.preExecutionSteps,
         };
 
         await enqueueEmbeddingJobs([job]);

@@ -74,6 +74,7 @@ export async function crawlHash(options: CrawlOptions) {
             libraryDescription,
             sourceUrl: currentUrl,
             customEnrichmentPrompt: source.config.customEnrichmentPrompt,
+            preExecutionSteps: source.config.preExecutionSteps,
           };
 
           await enqueueEmbeddingJobs([job]);
