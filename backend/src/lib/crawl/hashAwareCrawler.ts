@@ -313,7 +313,7 @@ async function crawlTraditionalSite(options: CrawlOptions) {
 
   const crawler = new PlaywrightCrawler(
     {
-      maxRequestsPerCrawl: source.config.maxDepth || 1000,
+      maxRequestsPerCrawl: 1000, // Default crawl limit
       maxConcurrency: 1, // Documentation scraping uses single concurrency
 
       async requestHandler({ request, enqueueLinks, log }) {

@@ -49,9 +49,6 @@ export type WebScrapeSource = {
   description: string;
   startUrl: string;
   config: {
-    contentSelector?: string;
-    codeSelector?: string;
-    maxDepth?: number;
     preExecutionSteps?: string;
     customEnrichmentPrompt?: string;
   };

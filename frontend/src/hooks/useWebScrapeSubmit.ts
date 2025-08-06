@@ -28,9 +28,6 @@ export const useWebScrapeSubmit = (
       description,
       startUrl,
       customEnrichmentPrompt,
-      contentSelector,
-      codeSelector,
-      maxDepth,
     } = formData;
 
     const source: WebScrapeSource = {
@@ -39,9 +36,6 @@ export const useWebScrapeSubmit = (
       description,
       startUrl,
       config: {
-        contentSelector,
-        codeSelector,
-        maxDepth: maxDepth || undefined,
         customEnrichmentPrompt,
       },
     };
