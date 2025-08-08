@@ -54,4 +54,17 @@ export type WebScrapeSource = {
   };
 };
 
-export type DocumentationSource = ApiSpecSource | WebScrapeSource;
+export type GitlabRepoSource = {
+  type: 'gitlab-repo';
+  name: string;
+  description: string;
+  repoUrl: string;
+  ref?: string; // Branch, tag, or commit SHA (optional)
+  config: {
+    includeGlobs?: string[]; // File patterns to include
+    excludeGlobs?: string[]; // File patterns to exclude
+    additionalInstructions?: string;
+  };
+};
+
+export type DocumentationSource = ApiSpecSource | WebScrapeSource | GitlabRepoSource;

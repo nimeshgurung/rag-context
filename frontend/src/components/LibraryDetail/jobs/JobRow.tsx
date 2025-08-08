@@ -1,7 +1,8 @@
 import React from 'react';
-import { TableRow, TableCell, Checkbox, Typography, Chip, Box, IconButton } from '@mui/material';
+import { TableRow, TableCell, Checkbox, Box, IconButton } from '@mui/material';
 import { PlayArrow, Delete, Refresh } from '@mui/icons-material';
 import { StatusChip } from './StatusChip';
+import { SourceDisplay } from './SourceDisplay';
 import type { JobItem } from '../../../types';
 
 interface JobRowProps {
@@ -24,9 +25,11 @@ export const JobRow: React.FC<JobRowProps> = ({
       <Checkbox checked={isSelected} onChange={onToggleSelection} />
     </TableCell>
     <TableCell>
-      <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-        {job.sourceUrl}
-      </Typography>
+      <SourceDisplay
+        source={job.source}
+        sourceType={job.sourceType}
+        originUrl={job.originUrl}
+      />
     </TableCell>
 
     <TableCell>

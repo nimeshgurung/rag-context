@@ -70,7 +70,9 @@ export async function crawlHash(options: CrawlOptions) {
           const job: EmbeddingJobInput = {
             jobId,
             libraryId,
-            sourceUrl: currentUrl,
+            source: currentUrl, // URL to be fetched
+            sourceType: 'web-scrape',
+            originUrl: null, // Not needed for web scraping
             additionalInstructions: source.config.additionalInstructions,
             preExecutionSteps: source.config.preExecutionSteps,
           };

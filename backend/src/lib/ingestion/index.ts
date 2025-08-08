@@ -2,6 +2,7 @@ import { sendEvent } from '../events';
 import { DocumentationSource } from '../types';
 import { handleApiSpecSource } from './apiSpec';
 import { handleWebScrapeSource } from './webScrape';
+import { handleGitlabRepoSource } from './gitlabRepo';
 
 export async function addDocumentationSource(
   jobId: string,
@@ -15,6 +16,9 @@ export async function addDocumentationSource(
         break;
       case 'web-scrape':
         await handleWebScrapeSource(jobId, source, existingLibraryId);
+        break;
+      case 'gitlab-repo':
+        await handleGitlabRepoSource(jobId, source, existingLibraryId);
         break;
       default:
         throw new Error('Unknown documentation source type');

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { addDocumentationSource as apiAddDocumentationSource } from '../../services/api';
 import { libraryKeys } from '../../lib/queryKeys';
-import type { ApiSpecSource, WebScrapeSource } from 'backend/src/lib/types';
+import type { ApiSpecSource, WebScrapeSource, GitlabRepoSource } from 'backend/src/lib/types';
 
 
 export const useAddDocumentationSource = () => {
@@ -9,7 +9,7 @@ export const useAddDocumentationSource = () => {
 
   return useMutation({
     mutationFn: async (params: {
-      source: ApiSpecSource | WebScrapeSource;
+      source: ApiSpecSource | WebScrapeSource | GitlabRepoSource;
     }) => {
       const result = await apiAddDocumentationSource(params.source);
       return result;

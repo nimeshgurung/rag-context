@@ -78,8 +78,10 @@ export const embeddingJobs = pgTable(
     id: serial('id').primaryKey(),
     jobId: varchar('job_id').notNull(), // UUID for grouping related jobs
     libraryId: text('library_id').notNull(),
-    sourceUrl: text('source_url').notNull(),
-
+    // Simplified source model
+    source: text('source').notNull(), // For 'web-scrape': URL to fetch; For 'gitlab-repo': markdown content; For 'api-spec': spec content
+    sourceType: varchar('source_type', { length: 20 }).notNull(), // 'web-scrape' | 'gitlab-repo' | 'api-spec'
+    originUrl: text('origin_url'), // Canonical trace URL (e.g., gitlab://... for GitLab repos)
     additionalInstructions: text('additional_instructions'), // Additional AI instructions
     preExecutionSteps: text('pre_execution_steps'), // JavaScript code to execute before scraping
     status: varchar('status', { length: 20 }).default('pending'), // 'pending' | 'processing' | 'completed' | 'failed'
@@ -94,13 +96,10 @@ export const embeddingJobs = pgTable(
     index('idx_embedding_jobs_job_id').on(table.jobId),
     // Index for querying jobs by library
     index('idx_embedding_jobs_library_id').on(table.libraryId),
-    // Index for source URL lookups
-    index('idx_embedding_jobs_source_url').on(table.sourceUrl),
-    // Compound index for common queries
-    index('idx_embedding_jobs_library_source').on(
-      table.libraryId,
-      table.sourceUrl,
-    ),
+    // Index for origin URL lookups (short URLs)
+    index('idx_embedding_jobs_origin_url').on(table.originUrl),
+    // Note: We don't index the 'source' column directly as it can contain large markdown content
+    // For source lookups, we use a hash-based index created in the migration
   ],
 );
 

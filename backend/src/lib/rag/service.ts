@@ -125,7 +125,7 @@ class RagService {
     }
 
     // Clean up existing embeddings for this URL to prevent duplicates
-    await this.deleteExistingEmbeddings(job.libraryId, job.sourceUrl);
+    await this.deleteExistingEmbeddings(job.libraryId, job.source);
 
     // Import the processing modules here (lazy loading)
     const { extractSemanticChunksFromMarkdown } = await import(
@@ -142,7 +142,7 @@ class RagService {
     });
 
     console.log(
-      `Processing ${markdown.length} characters of markdown for ${job.sourceUrl}`,
+      `Processing ${markdown.length} characters of markdown for ${job.source}`,
     );
 
     // Analyze markdown structure with AI to determine optimal header levels
@@ -201,7 +201,7 @@ class RagService {
           });
         }
       } catch (error) {
-        console.error(`Error processing section from ${job.sourceUrl}:`, error);
+        console.error(`Error processing section from ${job.source}:`, error);
         // Continue with other sections instead of failing completely
       }
     }
@@ -225,14 +225,14 @@ class RagService {
     const embeddingData = allChunks.map((chunk, i) => ({
       vectorId: this.generateDeterministicId(
         job.libraryId,
-        job.sourceUrl,
+        job.source,
         chunk.content,
       ),
       libraryId: job.libraryId,
       jobId: job.id, // Link to the embedding job record
       contentType: 'documentation' as const,
       content: chunk.content,
-      sourceUrl: job.sourceUrl,
+      sourceUrl: job.source,
       embedding: embeddingVectors[i],
       metadata: chunk.metadata,
     }));
@@ -251,7 +251,7 @@ class RagService {
       });
 
     console.log(
-      `Successfully ingested ${allChunks.length} documentation chunks for ${job.sourceUrl}`,
+      `Successfully ingested ${allChunks.length} documentation chunks for ${job.source}`,
     );
   }
 
@@ -317,7 +317,7 @@ class RagService {
    * All web scraping is now documentation-based with LLM code extraction.
    */
   async processJob(job: EmbeddingJobPayload, content: string): Promise<void> {
-    console.log(`Processing documentation job for ${job.sourceUrl}`);
+    console.log(`Processing documentation job for ${job.source}`);
 
     // Ensure we have content
     if (!content || content.trim().length === 0) {

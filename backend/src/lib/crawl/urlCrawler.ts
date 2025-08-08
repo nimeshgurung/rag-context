@@ -35,7 +35,9 @@ export async function crawlUrl(options: CrawlOptions) {
         const job: EmbeddingJobInput = {
           jobId,
           libraryId,
-          sourceUrl: request.url,
+          source: request.url, // URL to be fetched
+          sourceType: 'web-scrape',
+          originUrl: null, // Not needed for web scraping
           additionalInstructions: source.config.additionalInstructions,
           preExecutionSteps: source.config.preExecutionSteps,
         };

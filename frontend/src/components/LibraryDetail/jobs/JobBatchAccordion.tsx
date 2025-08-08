@@ -69,7 +69,7 @@ export const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
   const displayJobs = React.useMemo(() => {
     const jobsToFilter = data ? data.jobs : batch.jobs;
     return jobsToFilter.filter(job =>
-      job.sourceUrl.toLowerCase().includes(filterText.toLowerCase())
+      job.source.toLowerCase().includes(filterText.toLowerCase())
     );
   }, [data, batch.jobs, filterText]);
 

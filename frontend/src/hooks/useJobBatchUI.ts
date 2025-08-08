@@ -16,7 +16,7 @@ export function useJobBatchUI(jobs: JobItem[] = []) {
   // Filter jobs based on search text
   const filteredJobs = useMemo(
     () => jobs.filter(job =>
-      job.sourceUrl.toLowerCase().includes(filterText.toLowerCase())
+      job.source.toLowerCase().includes(filterText.toLowerCase())
     ),
     [jobs, filterText]
   );

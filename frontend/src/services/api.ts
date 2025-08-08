@@ -26,8 +26,11 @@ export interface CrawlJobStatus {
   };
   jobs: {
     id: number;
-    sourceUrl: string;
+    source: string;
+    sourceType: string;
+    originUrl?: string | null;
     status: string;
+    processedAt?: string | null;
   }[];
 }
 
@@ -187,7 +190,9 @@ export async function getAllJobsForLibrary(libraryId: string): Promise<{
     };
     jobs: Array<{
       id: number;
-      sourceUrl: string;
+      source: string;
+      sourceType: string;
+      originUrl?: string | null;
       status: string;
       processedAt: string | null;
     }>;

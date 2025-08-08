@@ -85,6 +85,20 @@
       "when": 1754516472754,
       "tag": "20250806214112_update_stored_procedure_for_content_column",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1754658136087,
+      "tag": "20250808130216_fix_large_content_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1754662826998,
+      "tag": "20250808142026_align_source_types",
+      "breakpoints": true
     }
   ]
 }

@@ -67,12 +67,13 @@ prd.txt
 node_modules/
 # Environment variables
 
-# Task files
-# tasks.json
-# tasks/
 .clinerules/
 .github/
 .trae/
 .windsurf/
 storage/
 .claude/
+
+# Task files
+# tasks.json
+# tasks/ 

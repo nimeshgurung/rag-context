@@ -1,6 +1,8 @@
 export interface JobItem {
   id: number;
-  sourceUrl: string;
+  source: string; // For 'web-scrape': URL; For 'gitlab-repo': markdown content; For 'api-spec': spec content
+  sourceType: string; // 'web-scrape' | 'gitlab-repo' | 'api-spec'
+  originUrl?: string | null; // Canonical trace URL (e.g., gitlab://... for GitLab repos)
   status: string;
   processedAt: string | null;
 }

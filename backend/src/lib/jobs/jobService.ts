@@ -15,7 +15,9 @@ import { fetchMarkdownForUrl } from '../crawl/utils/contentFetcher';
 export interface EmbeddingJobInput {
   jobId?: string;
   libraryId: string;
-  sourceUrl: string;
+  source: string;  // For 'web-scrape': URL to fetch; For 'gitlab-repo': markdown content; For 'api-spec': spec content
+  sourceType: string; // 'web-scrape' | 'gitlab-repo' | 'api-spec' - Required!
+  originUrl?: string | null; // Canonical trace URL (e.g., gitlab://... for GitLab repos)
   additionalInstructions?: string;
   preExecutionSteps?: string;
 }
@@ -32,7 +34,9 @@ export interface JobBatch {
   createdAt: Date;
   jobs: {
     id: number;
-    sourceUrl: string;
+    source: string;
+    sourceType: string;
+    originUrl: string | null;
     status: string;
     processedAt: Date | null;
   }[];
@@ -161,8 +165,9 @@ class JobService {
         const jobData = jobs.map((job) => ({
           jobId: job.jobId || '',
           libraryId: job.libraryId,
-          sourceUrl: job.sourceUrl,
-
+          source: job.source,
+          sourceType: job.sourceType,
+          originUrl: job.originUrl || null,
           additionalInstructions: job.additionalInstructions || null,
           preExecutionSteps: job.preExecutionSteps || null,
         }));
@@ -201,7 +206,9 @@ class JobService {
             ej.id,
             ej.job_id,
             ej.library_id,
-            ej.source_url,
+            ej.source,
+            ej.source_type,
+            ej.origin_url,
             ej.additional_instructions,
             ej.pre_execution_steps,
             l.name as library_name,
@@ -217,7 +224,9 @@ class JobService {
               ej.id,
               ej.job_id,
               ej.library_id,
-              ej.source_url,
+              ej.source,
+              ej.source_type,
+              ej.origin_url,
               ej.additional_instructions,
               ej.pre_execution_steps,
               l.name as library_name,
@@ -235,7 +244,9 @@ class JobService {
               ej.id,
               ej.job_id,
               ej.library_id,
-              ej.source_url,
+              ej.source,
+              ej.source_type,
+              ej.origin_url,
               ej.additional_instructions,
               ej.pre_execution_steps,
               l.name as library_name,
@@ -255,7 +266,9 @@ class JobService {
             id: number;
             job_id: string;
             library_id: string;
-            source_url: string;
+            source: string;
+            source_type: string;
+            origin_url: string | null;
             additional_instructions: string | null;
             pre_execution_steps: string | null;
             library_name: string;
@@ -267,8 +280,11 @@ class JobService {
           libraryId: row.library_id,
           libraryName: row.library_name,
           libraryDescription: row.library_description,
-          sourceUrl: row.source_url,
+          source: row.source,
+          sourceType: row.source_type,
+          originUrl: row.origin_url,
           additionalInstructions: row.additional_instructions || undefined,
+          preExecutionSteps: row.pre_execution_steps || undefined,
         }));
 
         if (jobs.length > 0) {
@@ -340,48 +356,86 @@ class JobService {
       // Update status to processing
       await this.markJobAsProcessing(job.id);
 
-      // All web scraping is now documentation-based
+      // Handle different source types - aligned with DocumentationSource types
+      let markdown: string | undefined;
+      let displayUrl: string;
+      let embeddingSourceUrl: string;
 
-      // Fetch fresh content from the URL (all web scraping is documentation-based)
-      let fetchResult;
-      try {
-        fetchResult = await fetchMarkdownForUrl(
-          job.sourceUrl,
-          job.preExecutionSteps,
-        );
+            switch (job.sourceType) {
+        case 'gitlab-repo':
+          // GitLab repos have pre-fetched markdown content in the source field
+          markdown = job.source;
+          // Use originUrl for display and embedding tracking
+          displayUrl = job.originUrl || 'gitlab-repo';
+          embeddingSourceUrl = job.originUrl || 'gitlab-repo';
 
-        if (!fetchResult.success) {
-          isFetchError = true;
-          throw new Error(`Failed to fetch content: ${fetchResult.error}`);
-        }
-      } catch (error) {
-        isFetchError = true;
-        throw error;
+          console.log(
+            `Processing GitLab job ${job.id} from stored content (${markdown.length} chars), origin: ${displayUrl}`,
+          );
+          break;
+
+        case 'web-scrape':
+          // Web scrapes need to fetch content from the URL in the source field
+          let fetchResult;
+          try {
+            fetchResult = await fetchMarkdownForUrl(
+              job.source,
+              job.preExecutionSteps,
+            );
+
+            if (!fetchResult.success) {
+              isFetchError = true;
+              throw new Error(`Failed to fetch content: ${fetchResult.error}`);
+            }
+
+            markdown = fetchResult.markdown;
+            displayUrl = job.source;
+            embeddingSourceUrl = job.source;
+          } catch (error) {
+            isFetchError = true;
+            throw error;
+          }
+
+          console.log(
+            `Processing web-scrape job ${job.id} for ${job.source} with fresh content (${markdown?.length || 0} chars)`,
+          );
+          break;
+
+        case 'api-spec':
+          // API specs shouldn't normally go through this flow, but handle them if they do
+          markdown = job.source;
+          displayUrl = job.originUrl || 'api-spec';
+          embeddingSourceUrl = job.originUrl || 'api-spec';
+
+          console.log(
+            `Processing API spec job ${job.id} - unexpected in this flow`,
+          );
+          break;
+
+        default:
+          // This should never happen with proper sourceType validation
+          throw new Error(`Invalid sourceType: ${job.sourceType}. Must be 'web-scrape', 'gitlab-repo', or 'api-spec'`);
       }
 
       // Check if we got any content
-      const hasContent =
-        fetchResult.markdown && fetchResult.markdown.trim().length > 0;
+      const hasContent = markdown && markdown.trim().length > 0;
 
       if (!hasContent) {
         await this.markJobAsCompleted(job.id);
-        console.log(`No content found at URL ${job.sourceUrl}.`);
+        console.log(`No content found for job ${job.id}.`);
 
         // Send progress event for this skipped job
         if (job.jobId) {
           sendEvent(job.jobId, {
             type: 'progress',
-            message: `Skipped (no content): ${job.sourceUrl}`,
+            message: `Skipped (no content): ${displayUrl}`,
           });
         }
         return;
       }
 
-      console.log(
-        `Processing documentation job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
-      );
-
-      await ragService.processJob(job, fetchResult.markdown!);
+      // Process the job with the correct source URL for embedding tracking
+      await ragService.processJob({ ...job, source: embeddingSourceUrl }, markdown!);
       await this.markJobAsCompleted(job.id);
       console.log(`Job ${job.id} completed successfully.`);
 
@@ -389,7 +443,7 @@ class JobService {
       if (job.jobId) {
         sendEvent(job.jobId, {
           type: 'progress',
-          message: `Completed processing: ${job.sourceUrl}`,
+          message: `Completed processing: ${displayUrl}`,
         });
       }
     } catch (error: unknown) {
@@ -401,7 +455,7 @@ class JobService {
       if (job.jobId) {
         sendEvent(job.jobId, {
           type: 'progress',
-          message: `Failed (${errorType}): ${job.sourceUrl} - ${message}`,
+          message: `Failed (${errorType}): ${job.originUrl || job.source} - ${message}`,
         });
       }
 
@@ -463,8 +517,11 @@ class JobService {
     const rows = await db
       .select({
         id: embeddingJobs.id,
-        sourceUrl: embeddingJobs.sourceUrl,
+        source: embeddingJobs.source,
+        sourceType: embeddingJobs.sourceType,
+        originUrl: embeddingJobs.originUrl,
         status: embeddingJobs.status,
+        processedAt: embeddingJobs.processedAt,
       })
       .from(embeddingJobs)
       .where(eq(embeddingJobs.jobId, jobId))
@@ -482,8 +539,11 @@ class JobService {
       summary,
       jobs: rows.map((r) => ({
         id: r.id,
-        sourceUrl: r.sourceUrl || '',
+        source: r.source || '',
+        sourceType: r.sourceType || 'web-scrape',
+        originUrl: r.originUrl,
         status: r.status || 'pending',
+        processedAt: r.processedAt,
       })),
     };
   }
@@ -521,7 +581,9 @@ class JobService {
         id: embeddingJobs.id,
         jobId: embeddingJobs.jobId,
         libraryId: embeddingJobs.libraryId,
-        sourceUrl: embeddingJobs.sourceUrl,
+        source: embeddingJobs.source,
+        sourceType: embeddingJobs.sourceType,
+        originUrl: embeddingJobs.originUrl,
         additionalInstructions: embeddingJobs.additionalInstructions,
         preExecutionSteps: embeddingJobs.preExecutionSteps,
         libraryName: libraries.name,
@@ -536,67 +598,96 @@ class JobService {
       throw new Error(`Job with ID ${jobItemId} not found.`);
     }
 
-    const job: EmbeddingJobPayload & { id: number } = {
-      id: rows[0].id,
-      jobId: rows[0].jobId || undefined,
-      libraryId: rows[0].libraryId,
-      libraryName: rows[0].libraryName,
-      libraryDescription: rows[0].libraryDescription,
-      sourceUrl: rows[0].sourceUrl,
-      additionalInstructions: rows[0].additionalInstructions || undefined,
-      preExecutionSteps: rows[0].preExecutionSteps || undefined,
-    };
-
     try {
       // Update status to processing
-      await this.markJobAsProcessing(job.id);
+      await this.markJobAsProcessing(rows[0].id);
 
-      const fetchResult = await fetchMarkdownForUrl(
-        job.sourceUrl,
-        job.preExecutionSteps,
-      );
+      let markdown: string | undefined;
+      let sourceUrl: string;
 
-      if (!fetchResult.success) {
-        throw new Error(`Failed to fetch content: ${fetchResult.error}`);
+                  // Branch logic based on sourceType - aligned with DocumentationSource types
+      switch (rows[0].sourceType) {
+        case 'gitlab-repo':
+          // GitLab repos have pre-fetched markdown content in the source field
+          console.log(
+            `Processing GitLab job ${rows[0].id} with pre-fetched content from ${rows[0].originUrl}`,
+          );
+          markdown = rows[0].source;
+          sourceUrl = rows[0].originUrl || 'gitlab-repo';
+          break;
+
+        case 'web-scrape':
+          // Web scrapes need to fetch content from the URL in the source field
+          console.log(
+            `Fetching content for web-scrape job ${rows[0].id} from ${rows[0].source}`,
+          );
+
+          const fetchResult = await fetchMarkdownForUrl(
+            rows[0].source,
+            rows[0].preExecutionSteps || undefined,
+          );
+
+          if (!fetchResult.success) {
+            throw new Error(`Failed to fetch content: ${fetchResult.error}`);
+          }
+
+          markdown = fetchResult.markdown;
+          sourceUrl = rows[0].source;
+          break;
+
+        case 'api-spec':
+          // API specs are processed differently and shouldn't normally go through this flow
+          // but if they do, treat the source as content
+          console.log(
+            `Processing API spec job ${rows[0].id} - this is unexpected, API specs should be processed directly`,
+          );
+          markdown = rows[0].source;
+          sourceUrl = rows[0].originUrl || 'api-spec';
+          break;
+
+        default:
+          // This should never happen with proper sourceType validation
+          throw new Error(`Invalid sourceType: ${rows[0].sourceType}. Must be 'web-scrape', 'gitlab-repo', or 'api-spec'`);
       }
 
       // Check if we got any content
-      const hasContent =
-        fetchResult.markdown && fetchResult.markdown.trim().length > 0;
+      const hasContent = markdown && markdown.trim().length > 0;
 
       if (!hasContent) {
-        await this.markJobAsCompleted(job.id);
+        await this.markJobAsCompleted(rows[0].id);
         return {
           success: true,
-          message: `No content found at URL ${job.sourceUrl}.`,
+          message: `No content found for job ${rows[0].id}.`,
         };
       }
 
-      // Create job payload with fresh content
+      // Create job payload
       const jobPayload: EmbeddingJobPayload = {
-        id: job.id, // Include the job ID
-        jobId: job.jobId || undefined,
-        libraryId: job.libraryId,
-        libraryName: job.libraryName,
-        libraryDescription: job.libraryDescription,
-        sourceUrl: job.sourceUrl,
-        additionalInstructions: job.additionalInstructions || undefined,
-        preExecutionSteps: job.preExecutionSteps || undefined,
+        id: rows[0].id,
+        jobId: rows[0].jobId || undefined,
+        libraryId: rows[0].libraryId,
+        libraryName: rows[0].libraryName,
+        libraryDescription: rows[0].libraryDescription,
+        source: sourceUrl, // Use the appropriate source URL for tracking
+        sourceType: rows[0].sourceType,
+        originUrl: rows[0].originUrl || undefined,
+        additionalInstructions: rows[0].additionalInstructions || undefined,
+        preExecutionSteps: rows[0].preExecutionSteps || undefined,
       };
 
       console.log(
-        `Processing documentation job ${job.id} for ${job.sourceUrl} with fresh content (${fetchResult.markdown!.length} chars)`,
+        `Processing job ${rows[0].id} for ${sourceUrl} with content (${markdown!.length} chars)`,
       );
 
-      await ragService.processJob(jobPayload, fetchResult.markdown!);
-      await this.markJobAsCompleted(job.id);
+      await ragService.processJob(jobPayload, markdown!);
+      await this.markJobAsCompleted(rows[0].id);
 
       return {
         success: true,
-        message: `Job ${job.id} processed successfully with fresh content.`,
+        message: `Job ${rows[0].id} processed successfully.`,
       };
     } catch (error: unknown) {
-      await this.markJobAsFailed(job.id);
+      await this.markJobAsFailed(rows[0].id);
       throw error;
     }
   }
@@ -681,7 +772,9 @@ class JobService {
       .select({
         id: embeddingJobs.id,
         jobId: embeddingJobs.jobId,
-        sourceUrl: embeddingJobs.sourceUrl,
+        source: embeddingJobs.source,
+        sourceType: embeddingJobs.sourceType,
+        originUrl: embeddingJobs.originUrl,
         status: embeddingJobs.status,
         createdAt: embeddingJobs.createdAt,
         processedAt: embeddingJobs.processedAt,
@@ -704,7 +797,9 @@ class JobService {
 
       jobBatches[jobIdKey].jobs.push({
         id: row.id,
-        sourceUrl: row.sourceUrl || '',
+        source: row.source || '',
+        sourceType: row.sourceType || 'web-scrape',
+        originUrl: row.originUrl,
         status: row.status || 'pending',
         processedAt: row.processedAt,
       });
@@ -804,7 +899,7 @@ class JobService {
               if (job.jobId) {
                 sendEvent(job.jobId, {
                   type: 'progress',
-                  message: `Failed to process: ${job.sourceUrl} - ${message}`,
+                  message: `Failed to process: ${job.originUrl || job.source} - ${message}`,
                 });
               }
             }

@@ -44,7 +44,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
         summary: status.summary,
         jobs: status.jobs.map(job => ({
           ...job,
-          processedAt: null,
+          processedAt: job.processedAt ?? null, // Convert undefined to null
         }))
       };
       return jobBatchData;

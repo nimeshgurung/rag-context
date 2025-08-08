@@ -20,6 +20,7 @@ interface JobsTableProps {
   isAllSelected: boolean;
   isIndeterminate: boolean;
   isLoading: boolean;
+  isProcessing?: boolean;
   onSelectAll: () => void;
   onClearSelection: () => void;
   onToggleSelection: (id: number) => void;
