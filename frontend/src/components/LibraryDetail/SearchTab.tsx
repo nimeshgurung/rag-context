@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import {
   Box,
   Typography,
@@ -12,6 +12,23 @@ import { fetchLibraryDocumentation } from '../../services/api';
 interface SearchTabProps {
   libraryId: string;
 }
+
+const DocumentationViewer: React.FC<{ documentation: string }> = memo(({ documentation }) => (
+  <Box
+    component="pre"
+    sx={{
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      m: 0,
+    }}
+  >
+    {documentation}
+  </Box>
+));
+
+DocumentationViewer.displayName = 'DocumentationViewer';
 
 const SearchTab: React.FC<SearchTabProps> = ({ libraryId }) => {
   const [documentation, setDocumentation] = useState('');
@@ -84,20 +101,17 @@ const SearchTab: React.FC<SearchTabProps> = ({ libraryId }) => {
         <Typography variant="h6" gutterBottom>
           Documentation Results
         </Typography>
-          <TextField
-            fullWidth
-            multiline
-            value={documentation}
-            InputProps={{
-              readOnly: true,
-              style: {
-                fontFamily: 'monospace',
-                fontSize: '14px',
-              },
-            }}
-            rows={25}
-            variant="outlined"
-          />
+        <Box sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 1,
+          p: 2,
+          maxHeight: 600,
+          overflow: 'auto',
+          bgcolor: 'background.paper',
+        }}>
+          <DocumentationViewer documentation={documentation} />
+        </Box>
       </Paper>
     </Box>
   );

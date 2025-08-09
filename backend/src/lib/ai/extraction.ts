@@ -140,21 +140,8 @@ ${markdownContent}
       'AI extraction failed, falling back to simple chunking:',
       error instanceof Error ? error.message : String(error),
     );
-
-    // Fallback: Create a single chunk with the entire content
-    return [
-      {
-        title: 'Document Content',
-        description: 'Full document content (AI extraction failed)',
-        snippets: [
-          {
-            language: 'text',
-            code:
-              markdownContent.substring(0, 2000) +
-              (markdownContent.length > 2000 ? '...' : ''),
-          },
-        ],
-      },
-    ];
+    // Do not insert fallback content. Propagate failure so the job is marked failed.
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`AI extraction failed: ${reason}`);
   }
 }

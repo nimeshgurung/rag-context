@@ -15,7 +15,7 @@ import { fetchMarkdownForUrl } from '../crawl/utils/contentFetcher';
 export interface EmbeddingJobInput {
   jobId?: string;
   libraryId: string;
-  source: string;  // For 'web-scrape': URL to fetch; For 'gitlab-repo': markdown content; For 'api-spec': spec content
+  source: string; // For 'web-scrape': URL to fetch; For 'gitlab-repo': markdown content; For 'api-spec': spec content
   sourceType: string; // 'web-scrape' | 'gitlab-repo' | 'api-spec' - Required!
   originUrl?: string | null; // Canonical trace URL (e.g., gitlab://... for GitLab repos)
   additionalInstructions?: string;
@@ -326,6 +326,7 @@ class JobService {
       .set({
         status: 'failed',
         updatedAt: new Date(),
+        processedAt: new Date(),
       })
       .where(eq(embeddingJobs.id, jobId));
   }
@@ -361,7 +362,7 @@ class JobService {
       let displayUrl: string;
       let embeddingSourceUrl: string;
 
-            switch (job.sourceType) {
+      switch (job.sourceType) {
         case 'gitlab-repo':
           // GitLab repos have pre-fetched markdown content in the source field
           markdown = job.source;
@@ -414,7 +415,9 @@ class JobService {
 
         default:
           // This should never happen with proper sourceType validation
-          throw new Error(`Invalid sourceType: ${job.sourceType}. Must be 'web-scrape', 'gitlab-repo', or 'api-spec'`);
+          throw new Error(
+            `Invalid sourceType: ${job.sourceType}. Must be 'web-scrape', 'gitlab-repo', or 'api-spec'`,
+          );
       }
 
       // Check if we got any content
@@ -435,7 +438,10 @@ class JobService {
       }
 
       // Process the job with the correct source URL for embedding tracking
-      await ragService.processJob({ ...job, source: embeddingSourceUrl }, markdown!);
+      await ragService.processJob(
+        { ...job, source: embeddingSourceUrl },
+        markdown!,
+      );
       await this.markJobAsCompleted(job.id);
       console.log(`Job ${job.id} completed successfully.`);
 
@@ -605,7 +611,7 @@ class JobService {
       let markdown: string | undefined;
       let sourceUrl: string;
 
-                  // Branch logic based on sourceType - aligned with DocumentationSource types
+      // Branch logic based on sourceType - aligned with DocumentationSource types
       switch (rows[0].sourceType) {
         case 'gitlab-repo':
           // GitLab repos have pre-fetched markdown content in the source field
@@ -647,7 +653,9 @@ class JobService {
 
         default:
           // This should never happen with proper sourceType validation
-          throw new Error(`Invalid sourceType: ${rows[0].sourceType}. Must be 'web-scrape', 'gitlab-repo', or 'api-spec'`);
+          throw new Error(
+            `Invalid sourceType: ${rows[0].sourceType}. Must be 'web-scrape', 'gitlab-repo', or 'api-spec'`,
+          );
       }
 
       // Check if we got any content

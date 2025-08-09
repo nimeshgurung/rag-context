@@ -76,7 +76,7 @@ const HomePage: React.FC = () => {
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
-              <TableCell>Description</TableCell>
+              <TableCell sx={{ width: 480, maxWidth: 480 }}>Description</TableCell>
               <TableCell>Statistics</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
@@ -103,7 +103,20 @@ const HomePage: React.FC = () => {
                       {row.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{row.description}</TableCell>
+                  <TableCell>
+                    <Box
+                      sx={{
+                        width: 480,
+                        maxWidth: 480,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={row.description || ''}
+                    >
+                      {row.description}
+                    </Box>
+                  </TableCell>
                   <TableCell>
                     <LibraryStatsBadges libraryId={row.libraryId} size="small" />
                   </TableCell>
