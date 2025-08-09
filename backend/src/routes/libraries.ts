@@ -6,6 +6,7 @@ import {
   getAllJobsForLibrary,
   deleteLibrary,
 } from '../lib/api';
+import { getLibraryStats } from '../lib/libraries/stats';
 import { DocumentationSource } from '../lib/types';
 import { addDocumentationSource } from '../lib/ingestion';
 import { v4 as uuidv4 } from 'uuid';
@@ -113,6 +114,24 @@ router.get(
         success: false,
         message:
           error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    }
+  },
+);
+
+// Get library statistics (GitLab/WebScrape only)
+router.get(
+  '/:libraryId/stats',
+  async (req: Request<{ libraryId: string }>, res: Response): Promise<void> => {
+    const { libraryId } = req.params;
+    try {
+      const stats = await getLibraryStats(libraryId);
+      res.json(stats);
+    } catch (error) {
+      console.error(`Failed to get stats for library ${libraryId}:`, error);
+      res.status(500).json({
+        error: 'Failed to fetch library statistics',
+        message: error instanceof Error ? error.message : 'An unknown error occurred.',
       });
     }
   },

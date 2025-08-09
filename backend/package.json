@@ -34,6 +34,7 @@
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.44.3",
     "express": "^5.1.0",
+    "gpt-tokenizer": "^3.0.1",
     "html-to-text": "^9.0.5",
     "js-yaml": "^4.1.0",
     "jsdom": "^26.1.0",

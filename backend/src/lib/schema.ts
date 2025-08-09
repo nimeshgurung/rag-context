@@ -50,6 +50,7 @@ export const embeddings = pgTable(
     sourceUrl: text('source_url'),
     embedding: vector('embedding', { dimensions: 1536 }),
     metadata: jsonb('metadata'), // Can store extracted title/description if needed
+    tokenCount: integer('token_count').notNull().default(0), // Number of tokens in content, computed locally
   },
   (table) => [
     // GIN index for full-text search - directly on tsvector function
@@ -68,6 +69,8 @@ export const embeddings = pgTable(
       'hnsw',
       sql`${table.embedding} vector_cosine_ops`,
     ),
+    // Index for token count aggregation queries
+    index('idx_embeddings_token_count').on(table.tokenCount),
   ],
 );
 

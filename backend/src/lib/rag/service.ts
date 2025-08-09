@@ -8,6 +8,7 @@ import { db } from '../db';
 import { libraries, embeddings } from '../schema.js';
 import { sql, and, eq } from 'drizzle-orm';
 import { analyzeMarkdownHeaders } from '../ai/service';
+import { tokenizeText } from '../tokenizer';
 
 if (!process.env.POSTGRES_CONNECTION_STRING) {
   throw new Error('POSTGRES_CONNECTION_STRING is not set');
@@ -235,6 +236,7 @@ class RagService {
       sourceUrl: job.source,
       embedding: embeddingVectors[i],
       metadata: chunk.metadata,
+      tokenCount: tokenizeText(chunk.content), // Compute token count locally
     }));
 
     // Batch upsert - much more efficient than individual inserts
@@ -247,6 +249,7 @@ class RagService {
           content: sql.raw(`excluded.${embeddings.content.name}`),
           embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
           metadata: sql.raw(`excluded.${embeddings.metadata.name}`),
+          tokenCount: sql.raw(`excluded.${embeddings.tokenCount.name}`),
         },
       });
 
@@ -296,6 +299,7 @@ class RagService {
       sourceUrl: sourceUrl,
       embedding: embeddingVectors[i],
       metadata: item.metadata, // Store metadata including title if available
+      tokenCount: 0, // API specs are excluded from token stats, set to 0
     }));
 
     // Batch upsert - much more efficient than individual inserts
@@ -308,6 +312,7 @@ class RagService {
           content: sql.raw(`excluded.${embeddings.content.name}`),
           embedding: sql.raw(`excluded.${embeddings.embedding.name}`),
           metadata: sql.raw(`excluded.${embeddings.metadata.name}`),
+          tokenCount: sql.raw(`excluded.${embeddings.tokenCount.name}`),
         },
       });
   }

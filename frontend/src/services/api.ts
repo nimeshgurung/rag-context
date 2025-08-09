@@ -1,4 +1,5 @@
 import type { DocumentationSource } from 'backend/src/lib/types';
+import type { LibraryStats } from '../types';
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -204,6 +205,17 @@ export async function getAllJobsForLibrary(libraryId: string): Promise<{
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to get jobs for library');
+  }
+  return response.json();
+}
+
+export async function getLibraryStats(libraryId: string): Promise<LibraryStats> {
+  const response = await fetch(
+    `${API_BASE_URL}/libraries/${libraryId}/stats`,
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to get library statistics');
   }
   return response.json();
 }

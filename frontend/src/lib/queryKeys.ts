@@ -19,6 +19,7 @@ export const libraryKeys = {
   search: (query: string) => [...libraryKeys.lists(), { search: query }] as const,
   doc: (id: string, topic?: string) => [...libraryKeys.detail(id), 'documentation', { topic }] as const,
   latestJob: (id: string) => [...libraryKeys.detail(id), 'latest-job'] as const,
+  stats: (id: string) => [...libraryKeys.detail(id), 'stats'] as const,
 };
 
 // Usage examples:

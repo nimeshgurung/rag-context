@@ -18,6 +18,7 @@ import { useLibraryJobs } from '../hooks/queries/useLibraryJobs';
 import { useDeleteLibrary } from '../hooks/mutations/useDeleteLibrary';
 import AddDocsModal from '../components/AddDocsModal';
 import { useDialog } from '../context/DialogProvider';
+import LibraryStatsBadges from '../components/LibraryStatsBadges';
 
 const LibraryDetailPage: React.FC = () => {
   const { libraryId } = useParams<{ libraryId: string }>();
@@ -114,9 +115,10 @@ const LibraryDetailPage: React.FC = () => {
             <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
               {library.description}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 2 }}>
               ID: {library.libraryId}
             </Typography>
+            <LibraryStatsBadges libraryId={library.libraryId} size="small" />
           </Box>
           <Box sx={{ display: 'flex', gap: 2, ml: 2 }}>
             <Button

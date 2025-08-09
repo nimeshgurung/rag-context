@@ -21,3 +21,10 @@ export interface JobBatch {
   summary: JobSummary;
   jobs: JobItem[];
 }
+
+export interface LibraryStats {
+  libraryId: string;
+  totalChunks: number;
+  totalSnippets: number;
+  totalTokens: number;
+}

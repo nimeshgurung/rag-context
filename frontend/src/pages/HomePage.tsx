@@ -19,6 +19,7 @@ import { useLibraries } from '../hooks/queries/useLibraries';
 import { useDeleteLibrary } from '../hooks/mutations/useDeleteLibrary';
 import { useDialog } from '../context/DialogProvider';
 import AddDocsModal from '../components/AddDocsModal';
+import LibraryStatsBadges from '../components/LibraryStatsBadges';
 
 const HomePage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,7 +77,7 @@ const HomePage: React.FC = () => {
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Description</TableCell>
-              <TableCell>ID</TableCell>
+              <TableCell>Statistics</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -103,7 +104,9 @@ const HomePage: React.FC = () => {
                     </Link>
                   </TableCell>
                   <TableCell>{row.description}</TableCell>
-                  <TableCell>{row.libraryId}</TableCell>
+                  <TableCell>
+                    <LibraryStatsBadges libraryId={row.libraryId} size="small" />
+                  </TableCell>
                   <TableCell>
                     <Button
                       variant="outlined"
