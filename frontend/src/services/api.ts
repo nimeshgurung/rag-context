@@ -127,9 +127,31 @@ export async function processSingleJob(jobItemId: number) {
   return response.json();
 }
 
-export async function processAllJobs(jobId: string) {
+export type ProcessAllJobsResponse = {
+  success: boolean;
+  message: string;
+  statusCode?: number; // 200, 202, 429, 500 (when present)
+};
+
+export async function processAllJobs(
+  jobId: string,
+): Promise<ProcessAllJobsResponse> {
   const response = await fetch(`${API_BASE_URL}/jobs/process/all/${jobId}`, {
     method: 'POST',
+  });
+  return response.json();
+}
+
+export async function processSelectedJobs(
+  jobId: string,
+  ids: number[],
+): Promise<ProcessAllJobsResponse> {
+  const response = await fetch(`${API_BASE_URL}/jobs/process/selected`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ jobId, ids }),
   });
   return response.json();
 }

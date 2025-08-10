@@ -51,6 +51,7 @@ export const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
     processSelected,
     deleteSelected,
     isProcessing,
+    shouldDisableProcessing,
   } = useJobBatch(batch.jobId, {
     enabled: isExpanded,
     onSuccess: () => {
@@ -167,7 +168,7 @@ export const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
           filterText={filterText}
           setFilterText={setFilterText}
           selectedIds={selectedIds}
-          isProcessing={isProcessing}
+          shouldDisableProcessing={shouldDisableProcessing}
           hasPendingJobs={displayBatch.summary.pending > 0}
           hasSelectedPendingJobs={hasSelectedPendingJobs}
           hasSelectedCompletedOrFailedJobs={hasSelectedCompletedOrFailedJobs}
@@ -183,6 +184,7 @@ export const JobBatchAccordion: React.FC<JobBatchAccordionProps> = ({
           isIndeterminate={isIndeterminate}
           isLoading={isLoading && !data}
           isProcessing={isProcessing}
+          shouldDisableProcessing={shouldDisableProcessing}
           onSelectAll={selectAll}
           onClearSelection={clearSelection}
           onToggleSelection={toggleSelection}

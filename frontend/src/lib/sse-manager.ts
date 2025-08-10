@@ -140,11 +140,19 @@ class SSEManager {
         break;
 
       case 'processing:started':
+      case 'processing:progress':
       case 'processing:completed':
-        // Handle batch processing events
-        if (event.jobId && typeof event.jobId === 'string') {
+      case 'done':
+      case 'error':
+        // Handle batch processing events from child process worker
+        this.queryClient.invalidateQueries({
+          queryKey: jobKeys.batch(resourceId)
+        });
+
+        // Also invalidate library jobs if this batch belongs to a library
+        if (event.libraryId && typeof event.libraryId === 'string') {
           this.queryClient.invalidateQueries({
-            queryKey: jobKeys.batch(event.jobId)
+            queryKey: jobKeys.library(event.libraryId)
           });
         }
         break;

@@ -37,27 +37,39 @@ const server = app.listen(port, () => {
 });
 
 // Graceful shutdown handling
-const gracefulShutdown = (signal: string) => {
+const gracefulShutdown = async (signal: string) => {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
 
-  // Shutdown job service first
-  jobService.shutdown();
+  try {
+    // Shutdown child process manager first
+    const { childProcessManager } = await import(
+      './lib/jobs/childProcessManager'
+    );
+    await childProcessManager.shutdown();
 
-  server.close((err) => {
-    if (err) {
-      console.error('Error during server shutdown:', err);
+    // Shutdown job service
+    jobService.shutdown();
+
+    // Close server
+    server.close((err) => {
+      if (err) {
+        console.error('Error during server shutdown:', err);
+        process.exit(1);
+      }
+
+      console.log('Server closed successfully.');
+      process.exit(0);
+    });
+
+    // Force exit after 15 seconds if graceful shutdown fails
+    setTimeout(() => {
+      console.error('Graceful shutdown timeout. Forcing exit...');
       process.exit(1);
-    }
-
-    console.log('Server closed successfully.');
-    process.exit(0);
-  });
-
-  // Force exit after 5 seconds if graceful shutdown fails
-  setTimeout(() => {
-    console.error('Graceful shutdown timeout. Forcing exit...');
+    }, 15000);
+  } catch (error) {
+    console.error('Error during graceful shutdown:', error);
     process.exit(1);
-  }, 5000);
+  }
 };
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));

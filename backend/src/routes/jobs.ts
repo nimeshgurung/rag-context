@@ -4,6 +4,7 @@ import {
   deleteJob,
   processSingleJob,
   processAllJobs,
+  processSelected,
 } from '../lib/jobs/service';
 
 const router = express.Router();
@@ -45,7 +46,7 @@ router.delete(
   },
 );
 
-// Process a single job item
+// Process a single job item (requeue and trigger batch child worker)
 router.post(
   '/process/single',
   async (
@@ -53,10 +54,14 @@ router.post(
     res: Response,
   ): Promise<void> => {
     const { id } = req.body;
-    console.warn('Processing job item', id);
+    console.warn('Requeue+start job item', id);
     try {
       const result = await processSingleJob(parseInt(id, 10));
-      res.json(result);
+      if (result.statusCode) {
+        res.status(result.statusCode).json(result);
+      } else {
+        res.json(result);
+      }
     } catch (error) {
       console.error(`Failed to process job item ${id}:`, error);
       res.status(500).json({
@@ -75,13 +80,48 @@ router.post(
     const { jobId } = req.params;
     try {
       const result = await processAllJobs(jobId);
-      res.json(result);
+
+      // Handle different status codes based on capacity control
+      if (result.statusCode) {
+        res.status(result.statusCode).json(result);
+      } else {
+        res.json(result);
+      }
     } catch (error) {
       console.error(`Failed to start all-job processing for ${jobId}:`, error);
       res.status(500).json({
         success: false,
         message:
           error instanceof Error ? error.message : 'An unknown error occurred.',
+      });
+    }
+  },
+);
+
+// Process selected job items (requeue and trigger child worker for the batch)
+router.post(
+  '/process/selected',
+  async (
+    req: Request<object, { jobId: string; ids: number[] }>,
+    res: Response,
+  ): Promise<void> => {
+    try {
+      const { jobId, ids } = req.body as { jobId: string; ids: number[] };
+      if (!jobId || !Array.isArray(ids)) {
+        res.status(400).json({ success: false, message: 'jobId and ids[] required' });
+        return;
+      }
+      const result = await processSelected(jobId, ids);
+      if (result.statusCode) {
+        res.status(result.statusCode).json(result);
+      } else {
+        res.json(result);
+      }
+    } catch (error) {
+      console.error('Failed to process selected jobs:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'An unknown error occurred.',
       });
     }
   },

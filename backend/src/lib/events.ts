@@ -21,7 +21,11 @@ export function removeClient(resourceId: string, client: Response) {
 }
 
 export function sendEvent(resourceId: string, data: object) {
-  console.log(`[Event ${resourceId}]:`, data);
+  // Optional verbose logging for debugging only
+  if (process.env.SSE_LOG === '1') {
+    // eslint-disable-next-line no-console
+    console.log(`[Event ${resourceId}]:`, data);
+  }
 
   const clientSet = clients.get(resourceId);
   if (clientSet) {

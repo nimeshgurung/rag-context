@@ -6,7 +6,7 @@ interface ActionBarProps {
   filterText: string;
   setFilterText: (text: string) => void;
   selectedIds: Set<number>;
-  isProcessing: boolean;
+  shouldDisableProcessing?: boolean;
   hasPendingJobs: boolean;
   hasSelectedPendingJobs?: boolean;
   hasSelectedCompletedOrFailedJobs?: boolean;
@@ -19,7 +19,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   filterText,
   setFilterText,
   selectedIds,
-  isProcessing,
+  shouldDisableProcessing = false,
   hasPendingJobs,
   hasSelectedPendingJobs = false,
   hasSelectedCompletedOrFailedJobs = false,
@@ -57,7 +57,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
               variant="outlined"
               size="small"
               onClick={onProcessSelected}
-              disabled={isProcessing}
+              disabled={shouldDisableProcessing}
               startIcon={processButtonIcon}
               color={hasSelectedCompletedOrFailedJobs ? 'primary' : 'inherit'}
             >
@@ -68,7 +68,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
               size="small"
               color="error"
               onClick={onDeleteSelected}
-              disabled={isProcessing}
+              disabled={shouldDisableProcessing}
               startIcon={<Delete />}
             >
               Delete Selected
@@ -79,10 +79,10 @@ export const ActionBar: React.FC<ActionBarProps> = ({
           variant="contained"
           size="small"
           onClick={onProcessAll}
-          disabled={isProcessing || !hasPendingJobs}
-          startIcon={isProcessing ? <CircularProgress size={16} /> : <PlayArrow />}
+          disabled={shouldDisableProcessing || !hasPendingJobs}
+          startIcon={shouldDisableProcessing ? <CircularProgress size={16} /> : <PlayArrow />}
         >
-          {isProcessing ? 'Processing...' : 'Process All Pending'}
+          {shouldDisableProcessing ? 'Processing...' : 'Process All Pending'}
         </Button>
       </Box>
     </Box>

@@ -4,7 +4,9 @@ import {
   getCrawlJobStatus,
   processSingleJob,
   processAllJobs,
-  deleteJob
+  processSelectedJobs,
+  deleteJob,
+  type ProcessAllJobsResponse,
 } from '../../services/api';
 import type { JobBatch, JobItem } from '../../types';
 import { useSSEQuery } from '../useSSEQuery';
@@ -62,41 +64,56 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
   );
 
   // Process all jobs mutation
-  const processAllMutation = useMutation({
+  const processAllMutation = useMutation<
+    ProcessAllJobsResponse,
+    Error,
+    void,
+    { previousData?: JobBatch }
+  >({
     mutationFn: () => processAllJobs(jobId),
-    onMutate: async () => {
+    onMutate: async (): Promise<{ previousData?: JobBatch }> => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: jobKeys.batch(jobId) });
 
       // Snapshot previous value
       const previousData = queryClient.getQueryData<JobBatch>(jobKeys.batch(jobId));
 
-      // Optimistically update
-      if (previousData) {
-        queryClient.setQueryData<JobBatch>(jobKeys.batch(jobId), {
-          ...previousData,
-          summary: {
-            ...previousData.summary,
-            processing: previousData.summary.pending + previousData.summary.processing,
-            pending: 0,
-          },
-          jobs: previousData.jobs.map(job =>
-            job.status === 'pending' ? { ...job, status: 'processing' } : job
-          )
-        });
-      }
-
+      // Only optimistically update if we expect success (not for 202/429)
       return { previousData };
     },
     onError: (err, _, context) => {
-      // Revert optimistic update
+      // Revert optimistic update if any
       if (context?.previousData) {
         queryClient.setQueryData(jobKeys.batch(jobId), context.previousData);
       }
-      onError?.(err as Error);
+      // We use fetch, not axios; err is a generic Error. Surface it.
+      onError?.(err);
     },
-    onSuccess: () => {
-      // SSE will handle the updates, no need to force refetch
+    onSuccess: (result) => {
+      // Handle different success scenarios
+      if (result) {
+        if (!result.success && (result.statusCode === 202 || result.statusCode === 429)) {
+          // These are handled as "success" but with specific meanings
+          console.log(`Process all result: ${result.message}`);
+        } else if (result.success) {
+          // Actual success - optimistically update to show processing started
+          const previousData = queryClient.getQueryData<JobBatch>(jobKeys.batch(jobId));
+          if (previousData) {
+            queryClient.setQueryData<JobBatch>(jobKeys.batch(jobId), {
+              ...previousData,
+              summary: {
+                ...previousData.summary,
+                processing: previousData.summary.pending + previousData.summary.processing,
+                pending: 0,
+              },
+              jobs: previousData.jobs.map(job =>
+                job.status === 'pending' ? { ...job, status: 'processing' } : job
+              )
+            });
+          }
+        }
+      }
+
       onSuccess?.();
     },
   });
@@ -174,7 +191,7 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
   // Process multiple selected jobs
   const processSelectedMutation = useMutation({
     mutationFn: async (jobItemIds: number[]) => {
-      await Promise.all(jobItemIds.map(id => processSingleJob(id)));
+      await processSelectedJobs(jobId, jobItemIds);
     },
     onMutate: async (jobItemIds) => {
       await queryClient.cancelQueries({ queryKey: jobKeys.batch(jobId) });
@@ -244,6 +261,22 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
     },
   });
 
+  // Check if processing actions should be disabled
+  const shouldDisableProcessing = () => {
+    const batchData = query.data;
+    if (!batchData) return false;
+
+    // Disable if any jobs are currently processing
+    const hasProcessingJobs = batchData.summary.processing > 0;
+
+    // Disable if mutations are pending
+    const hasPendingMutations = processAllMutation.isPending ||
+                               processSingleMutation.isPending ||
+                               processSelectedMutation.isPending;
+
+    return hasProcessingJobs || hasPendingMutations;
+  };
+
   return {
     // Query state
     data: query.data,
@@ -270,5 +303,8 @@ export function useJobBatch(jobId: string, options: UseJobBatchOptions = {}) {
     isProcessing: processAllMutation.isPending ||
                   processSingleMutation.isPending ||
                   processSelectedMutation.isPending,
+
+    // UI control state
+    shouldDisableProcessing: shouldDisableProcessing(),
   };
 }

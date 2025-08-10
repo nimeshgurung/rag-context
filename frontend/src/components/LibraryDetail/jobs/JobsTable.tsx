@@ -21,6 +21,7 @@ interface JobsTableProps {
   isIndeterminate: boolean;
   isLoading: boolean;
   isProcessing?: boolean;
+  shouldDisableProcessing?: boolean;
   onSelectAll: () => void;
   onClearSelection: () => void;
   onToggleSelection: (id: number) => void;
@@ -34,6 +35,7 @@ export const JobsTable: React.FC<JobsTableProps> = ({
   isAllSelected,
   isIndeterminate,
   isLoading,
+  shouldDisableProcessing = false,
   onSelectAll,
   onClearSelection,
   onToggleSelection,
@@ -78,6 +80,7 @@ export const JobsTable: React.FC<JobsTableProps> = ({
               key={job.id}
               job={job}
               isSelected={selectedIds.has(job.id)}
+              shouldDisableProcessing={shouldDisableProcessing}
               onToggleSelection={() => onToggleSelection(job.id)}
               onProcess={() => onProcessJob(job.id)}
               onDelete={() => onDeleteJob(job.id)}

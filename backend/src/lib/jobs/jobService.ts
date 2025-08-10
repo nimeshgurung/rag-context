@@ -701,41 +701,118 @@ class JobService {
   }
 
   /**
-   * Start processing all embedding jobs for a given crawl batch in the background.
+   * Requeue a single job item and start/trigger the child-process batch for its batch jobId
+   */
+  async requeueAndStartSingle(jobItemId: number) {
+    // Find the job and its batch id
+    const rows = await db
+      .select({ id: embeddingJobs.id, jobId: embeddingJobs.jobId })
+      .from(embeddingJobs)
+      .where(eq(embeddingJobs.id, jobItemId))
+      .limit(1);
+
+    if (rows.length === 0 || !rows[0].jobId) {
+      throw new Error(`Job ${jobItemId} not found or missing jobId`);
+    }
+
+    const jobId = rows[0].jobId as string;
+
+    // Requeue the item: set back to pending
+    await db
+      .update(embeddingJobs)
+      .set({ status: 'pending', processedAt: null })
+      .where(eq(embeddingJobs.id, jobItemId));
+
+    // Start/trigger the child-process batch for this jobId
+    return await this.processAllJobs(jobId);
+  }
+
+  /**
+   * Requeue multiple selected job items for a batch and start/trigger the child worker
+   */
+  async requeueAndStartSelected(jobId: string, jobItemIds: number[]) {
+    if (!jobItemIds?.length) {
+      return {
+        success: false,
+        message: 'No job ids provided',
+        statusCode: 400,
+      };
+    }
+
+    // Validate all ids belong to the same jobId
+    const owners = await db
+      .select({ id: embeddingJobs.id, jobId: embeddingJobs.jobId })
+      .from(embeddingJobs)
+      .where(inArray(embeddingJobs.id, jobItemIds));
+
+    if (owners.length !== jobItemIds.length) {
+      return {
+        success: false,
+        message: 'One or more ids not found',
+        statusCode: 400,
+      };
+    }
+
+    const distinctJobIds = new Set(owners.map((o) => o.jobId));
+    if (distinctJobIds.size !== 1 || !distinctJobIds.has(jobId)) {
+      return {
+        success: false,
+        message: 'IDs belong to different jobId',
+        statusCode: 400,
+      };
+    }
+
+    // Requeue all
+    await db
+      .update(embeddingJobs)
+      .set({ status: 'pending', processedAt: null })
+      .where(inArray(embeddingJobs.id, jobItemIds));
+
+    // Trigger child-process batch
+    return await this.processAllJobs(jobId);
+  }
+
+  /**
+   * Start processing all embedding jobs for a given crawl batch using child process.
    *
    * @param jobId - Crawl batch ID (UUID string) from embedding_jobs.job_id
    *                This processes ALL URLs discovered in a single crawl operation.
-   * @returns Promise with success status and message about worker process
+   * @returns Promise with success status and message, or error status codes
    *
    * Example: processAllJobs("abc-123-def-456") processes all pending URLs
-   *          from that crawl batch by running in the same process with events
+   *          from that crawl batch by spawning a child process
    */
   async processAllJobs(jobId: string) {
-    try {
-      console.log(`Starting job processing for jobId: ${jobId}`);
+    // Import childProcessManager here to avoid circular dependency
+    const { childProcessManager } = await import('./childProcessManager');
 
-      setImmediate(() => {
-        this.processQueue(jobId).catch((error) => {
-          console.error(`Error in processQueue for jobId ${jobId}:`, error);
-          // Send error event if processing fails
-          sendEvent(jobId, {
-            type: 'progress',
-            message: `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          });
-          sendEvent(jobId, {
-            type: 'error',
-            message: 'Job processing failed',
-          });
-        });
-      });
+    // Check capacity
+    const capacityCheck = childProcessManager.canStartBatch(jobId);
+    if (!capacityCheck.canStart) {
+      const statusCode =
+        capacityCheck.reason === 'Batch already running' ? 202 : 429;
+      return {
+        success: false,
+        message: capacityCheck.reason!,
+        statusCode,
+      };
+    }
 
+    // Start batch processing in child process
+    const result = await childProcessManager.startBatch(jobId);
+
+    if (result.success) {
       return {
         success: true,
-        message: `Job processing for ${jobId} started.`,
+        message: result.message,
+        statusCode: 200,
       };
-    } catch (error) {
-      console.error(`Failed to start job processing for ${jobId}:`, error);
-      throw new Error('Failed to start job processing.');
+    } else {
+      return {
+        success: false,
+        message: result.message,
+        statusCode: 500,
+      };
     }
   }
 

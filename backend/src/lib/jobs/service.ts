@@ -23,11 +23,16 @@ export async function deleteJob(jobItemId: number) {
 }
 
 export async function processSingleJob(jobItemId: number) {
-  return await jobService.processSingleJob(jobItemId);
+  // Switch to requeue+start in child-process
+  return await jobService.requeueAndStartSingle(jobItemId);
 }
 
 export async function processAllJobs(jobId: string) {
   return await jobService.processAllJobs(jobId);
+}
+
+export async function processSelected(jobId: string, ids: number[]) {
+  return await jobService.requeueAndStartSelected(jobId, ids);
 }
 
 export async function getLatestJobForLibrary(libraryId: string) {
